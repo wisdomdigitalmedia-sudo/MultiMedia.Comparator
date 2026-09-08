@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Help — Media Comparator{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Guide</p>
+    <h1>How quality is chosen</h1>
+  </div>
+</section>
+
+<div class="card">
+  <h2>Dashboard map</h2>
+  <dl class="map-grid">
+    <div class="map-item">
+      <dt>Layout</dt>
+      <dd>Sticky top rail on desktop (sliding active pill). Four-tab dock on phones. One content column, max 1180px.</dd>
+    </div>
+    <div class="map-item">
+      <dt>Charts</dt>
+      <dd>Pool ring + per-drive free-space columns, plus used meters. Unknown volumes are listed, never drawn as 0%. Missing sizes are pulled from the media-host agent automatically.</dd>
+    </div>
+    <div class="map-item">
+      <dt>Advanced groups</dt>
+      <dd>Duplicates → Advanced is a catalog listing: pick columns, set their order, sort files, then print or save — the same idea as a directory printer, for every copy in a group.</dd>
+    </div>
+    <div class="map-item">
+      <dt>Dark mode</dt>
+      <dd>Near-black canvas, teal accent, mint keep / amber warn / rose critical. Body text stays high-contrast; teal is not used as paragraph color.</dd>
+    </div>
+    <div class="map-item">
+      <dt>Honest look</dt>
+      <dd>Premium local tool — not a SaaS marketing site. No fake activity, no invented capacity, no decorative 3D.</dd>
+    </div>
+  </dl>
+</div>
+
+<div class="card prose">
+  <h2>What this app does</h2>
+  <ul>
+    <li>Manages the same <strong>catalog.db</strong> as Media Catalog — add, scan, and remove drives here</li>
+    <li>Groups the same movie / episode / track across those drives</li>
+    <li>Scores every copy and marks one <strong>KEEP</strong></li>
+    <li>Optionally deep-scans those copies with <code>ffprobe</code> / MediaInfo</li>
+    <li>Deletes a copy only after a two-step warning that shows the exact path twice</li>
+  </ul>
+
+  <h2>Grouping</h2>
+  <ul>
+    <li>Movies: normalized title + year (The Matrix 1999 ≠ Matrix Reloaded 2003)</li>
+    <li>TV: show + SxxExx (or air date for daily shows)</li>
+    <li>Audio: album + track</li>
+    <li>CD1/CD2 and serial chapters stay separate</li>
+    <li>Director’s Cut / Extended are flagged but still compared for quality</li>
+  </ul>
+
+  <h2>Score (best overall)</h2>
+  <ol>
+    <li>Resolution (8K → 4K → 1080p → 720p → SD)</li>
+    <li>Source (Remux &gt; Blu-ray &gt; WEB-DL &gt; WEBRip &gt; HDTV &gt; DVD &gt; CAM)</li>
+    <li>Video codec (AV1 / VVC / HEVC / H.264 / MPEG-4 / …)</li>
+    <li>HDR (Dolby Vision, HDR10+, HDR10)</li>
+    <li>Audio (TrueHD Atmos, DTS-HD MA, FLAC, DD+, AC-3, AAC, MP3)</li>
+    <li>File size vs expected bitrate for that resolution</li>
+    <li>Container + whether a deep probe confirmed the streams</li>
+  </ol>
+  <p>3D SBS/HOU copies are penalized for “best overall” (most libraries want the 2D master).</p>
+
+  <h2>Codecs &amp; containers scanned</h2>
+  <p>
+    Video: MKV, MK3D, MP4, M4V, MOV, AVI, WebM, MPG/MPEG, TS/M2TS, WMV, FLV, OGV, RMVB, 3GP, MXF, VOB, …
+    Audio: FLAC, ALAC, WAV, AIFF, MP3, M4A, AAC, OGG, Opus, DTS, TrueHD, AC-3, E-AC-3, APE, WavPack, …
+  </p>
+
+  <h2>Deep scan</h2>
+  <p>
+    Deep scan needs <code>ffprobe</code> on the <strong>file host</strong> — this PC
+    for local folders, the media-host PC for remote disks.
+    The app installs it automatically if it is missing (portable build under
+    <code>tools/ffmpeg</code>, or <code>apt</code> when passwordless sudo is available).
+  </p>
+  <p>
+    Remote disks need the <strong>Media Host installer 1.6</strong> on the
+    machine that holds the files (Windows, Linux, or Mac).
+    Open <a href="{{ url_for('setup_page') }}">Setup</a> to answer two questions
+    and scan the LAN, or
+    <a href="{{ url_for('download_host_setup') }}">download media-host-setup-1.6.zip</a>
+    and double-click <code>INSTALL.bat</code> / run <code>INSTALL.sh</code>.
+    On Windows, firewall setup shows a Yes/No permission prompt
+    (it may appear behind the browser) — click <strong>Yes</strong>.
+    If that step still fails, double-click <code>OPEN_FIREWALL.bat</code>.
+  </p>
+  <pre class="code">python3 cli.py ensure-ffprobe</pre>
+
+  <h2>Supported layouts</h2>
+  <ul>
+    <li>Linux catalog + Windows file server</li>
+    <li>Linux catalog + Linux media server / NAS</li>
+    <li>Windows catalog + Windows file server</li>
+    <li>Windows catalog + Linux file server</li>
+    <li>Mac catalog + Windows or Linux file host</li>
+    <li>Everything on one computer (no agent)</li>
+  </ul>
+  <p>Setup scans this subnet for ports 8766 (agent) and 8767 (Comparator) and fills in the address when it finds one.</p>
+
+  <h2>Drives</h2>
+  <p>
+    <strong>Drives</strong> is the catalog. Add a remote volume through the
+    media-host agent, or a folder mounted on this PC. <strong>Remove</strong>
+    drops the volume from the catalog only — files on disk stay put.
+    Size/free is read from the agent automatically.
+  </p>
+</div>
+{% endblock %}

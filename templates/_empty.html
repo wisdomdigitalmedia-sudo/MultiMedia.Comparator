@@ -1,0 +1,27 @@
+{% macro empty_state(eyebrow, title, body, note=None, actions=None) %}
+<article class="card empty-state">
+  <div class="empty-mark" aria-hidden="true">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+      <rect x="4" y="5" width="16" height="14" rx="2"/>
+      <path d="M8 13h8M8 9h5"/>
+    </svg>
+  </div>
+  <p class="eyebrow">{{ eyebrow }}</p>
+  <h2>{{ title }}</h2>
+  <p>{{ body }}</p>
+  {% if note %}<p class="muted small">{{ note }}</p>{% endif %}
+  {% if actions %}
+    <div class="actions">
+      {% for a in actions %}
+        {% if a.method == 'post' %}
+          <form method="post" action="{{ a.href }}" class="inline-form" {% if a.slow %}data-slow="{{ a.slow }}"{% endif %}>
+            <button class="btn {{ a.class or 'primary' }}" type="submit" {% if a.disabled %}disabled{% endif %}>{{ a.label }}</button>
+          </form>
+        {% else %}
+          <a class="btn {{ a.class or 'primary' }}" href="{{ a.href }}">{{ a.label }}</a>
+        {% endif %}
+      {% endfor %}
+    </div>
+  {% endif %}
+</article>
+{% endmacro %}

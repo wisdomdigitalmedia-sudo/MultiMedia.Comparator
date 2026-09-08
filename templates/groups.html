@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+{% from "_empty.html" import empty_state %}
+{% block title %}Duplicates — Media Comparator{% endblock %}
+{% block wrap_class %}{% if view == 'advanced' %}wrap-wide{% endif %}{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="crumb"><a href="{{ url_for('index') }}">Dashboard</a> / Duplicates</p>
+    <h1>Duplicate groups</h1>
+    <p class="muted">
+      {{ total }} group{{ 's' if total != 1 else '' }}
+      · extra copies stay on disk until you delete them
+    </p>
+  </div>
+  <div class="actions hero-actions">
+    <form method="post" action="{{ url_for('run_compare') }}" class="inline-form" data-slow="Comparing the library…">
+      <button class="btn" type="submit">Re-compare</button>
+    </form>
+    <form method="post" action="{{ url_for('deep_scan') }}" class="inline-form" data-slow="Deep-scanning grouped files…">
+      <button class="btn primary" type="submit">Deep-scan groups</button>
+    </form>
+    <a class="btn ghost" href="{{ url_for('export_json') }}">Export JSON</a>
+    <a class="btn ghost" href="{{ url_for('export_csv') }}">Export CSV</a>
+  </div>
+</section>
+
+{% if compared and not stale %}
+  <div class="source-tabs card print-hide">
+    <a class="tab {% if view != 'advanced' %}active{% endif %}"
+       href="{{ url_for('groups_page', q=q, kind=kind, sort=sort, view='simple') }}">Simple</a>
+    <a class="tab {% if view == 'advanced' %}active{% endif %}"
+       href="{{ url_for('groups_page', q=q, kind=kind, sort=sort, view='advanced') }}">Advanced</a>
+  </div>
+{% endif %}
+
+<form class="filters card" method="get">
+  <input type="hidden" name="view" value="{{ view }}">
+  <label>Search
+    <input name="q" value="{{ q }}" placeholder="title, file, drive">
+  </label>
+  <label>Kind
+    <select name="kind">
+      <option value="" {% if not kind %}selected{% endif %}>All</option>
+      <option value="movie" {% if kind == 'movie' %}selected{% endif %}>Movies</option>
+      <option value="episode" {% if kind == 'episode' %}selected{% endif %}>TV</option>
+      <option value="audio" {% if kind == 'audio' %}selected{% endif %}>Audio</option>
+    </select>
+  </label>
+  <label>Sort
+    <select name="sort">
+      <option value="gap" {% if sort == 'gap' %}selected{% endif %}>Biggest quality gap</option>
+      <option value="copies" {% if sort == 'copies' %}selected{% endif %}>Most copies</option>
+      <option value="name" {% if sort == 'name' %}selected{% endif %}>Title</option>
+    </select>
+  </label>
+  <button class="btn" type="submit">Filter</button>
+</form>
+
+{% if stale %}
+  {{ empty_state(
+    "Session cleared",
+    "The last ranking is not in this session",
+    "A compare finished earlier, but the live list lives in memory so the page does not freeze rebuilding 100k titles. Run Re-compare when you want the keepers back.",
+    "This is a refresh, not a failed scan.",
+    empty_nocompare
+  ) }}
+{% elif not compared %}
+  {{ empty_state(
+    "No comparison yet",
+    "Nothing is missing — nothing has been ranked",
+    "Load a source, then run Find duplicates. This list stays empty on purpose until there is a keeper to recommend.",
+    "A spinner here would imply the work already started. It has not.",
+    empty_nocompare
+  ) }}
+{% elif not groups and (q or kind) %}
+  {{ empty_state(
+    "No matches",
+    "Nothing matches that filter",
+    "The compare results are still here. Try another title, or clear Kind and Search.",
+    none,
+    [{"href": url_for("groups_page"), "label": "Clear filters", "class": "primary"}]
+  ) }}
+{% elif not groups %}
+  {{ empty_state(
+    "Clean library",
+    "No extra copies turned up",
+    "The last compare finished and did not find two files that look like the same title. That is a real result, not a failed load.",
+    none,
+    [{"href": url_for("index"), "label": "Back to dashboard", "class": "ghost"}]
+  ) }}
+{% else %}
+  <div class="pager muted small">
+    <span>Page {{ page }} / {{ pages }}</span>
+    <span>
+      {% if page > 1 %}<a href="{{ url_for('groups_page', q=q, kind=kind, sort=sort, view=view, page=page-1) }}">Prev</a>{% endif %}
+      {% if page < pages %}<a href="{{ url_for('groups_page', q=q, kind=kind, sort=sort, view=view, page=page+1) }}">Next</a>{% endif %}
+    </span>
+  </div>
+  {% if view == 'advanced' %}
+    <div class="adv-layout" data-advanced>
+      <aside class="card file-info-card print-hide">
+        <p class="eyebrow">File info</p>
+        <h2>Columns</h2>
+        <p class="muted small">Check what to list. Arrows set print order, first to last.</p>
+        <div class="fi-list" data-file-info></div>
+      </aside>
+      <div class="adv-main">
+        <div class="card adv-toolbar print-hide">
+          <fieldset>
+            <legend>Listing</legend>
+            <label class="inline"><input type="radio" name="list-mode" data-list-mode value="both" checked> Groups &amp; files</label>
+            <label class="inline"><input type="radio" name="list-mode" data-list-mode value="files"> File info only</label>
+          </fieldset>
+          <label>Sort files by
+            <select data-file-sort>
+              <option value="name">File name</option>
+              <option value="size">File size</option>
+              <option value="score">Score</option>
+              <option value="drive">Drive</option>
+              <option value="path">Full path</option>
+            </select>
+          </label>
+          <fieldset>
+            <legend>Order</legend>
+            <label class="inline"><input type="radio" name="file-dir" data-file-asc checked> Ascending</label>
+            <label class="inline"><input type="radio" name="file-dir" data-file-desc> Descending</label>
+          </fieldset>
+          <div class="actions">
+            <button class="btn" type="button" data-print-listing>Print listing</button>
+            <button class="btn primary" type="button" data-save-listing>Save listing</button>
+          </div>
+        </div>
+        <div class="card table-wrap adv-scroll">
+          <table class="data adv-table" data-adv-table>
+            <thead>
+              <tr>
+                <th data-col="role">Role</th>
+                <th data-col="title">Group</th>
+                <th data-col="kind">Kind</th>
+                <th data-col="drive">Drive</th>
+                <th data-col="file">File name</th>
+                <th data-col="stem">Name</th>
+                <th data-col="ext">Ext</th>
+                <th data-col="path">Full path</th>
+                <th data-col="size">Size</th>
+                <th data-col="score">Score</th>
+                <th data-col="summary">Summary</th>
+                <th data-col="res">Resolution</th>
+                <th data-col="vcodec">Video</th>
+                <th data-col="acodec">Audio</th>
+                <th data-col="source">Source</th>
+                <th data-col="hdr">HDR</th>
+                <th data-col="duration">Duration</th>
+                <th data-col="edition">Edition</th>
+                <th class="print-hide"></th>
+              </tr>
+            </thead>
+            {% for g in groups %}
+              {% set extra_bytes = namespace(n=0) %}
+              {% for c in g.copies %}
+                {% if not c.is_winner %}
+                  {% set extra_bytes.n = extra_bytes.n + (c.item.size_bytes or 0) %}
+                {% endif %}
+              {% endfor %}
+              <tbody data-group-body>
+                <tr class="group-head" data-group-head>
+                  <td data-span colspan="18">
+                    <a href="{{ url_for('group_detail', key=g.key) }}">{{ g.label }}</a>
+                    <span class="muted small">
+                      · {{ g.copies|length }} file{{ 's' if g.copies|length != 1 else '' }}
+                      · gap {{ g.score_gap }}
+                      {% if g.mixed_editions %} · {{ g.editions|join(', ') }}{% endif %}
+                    </span>
+                  </td>
+                </tr>
+                {% for c in g.copies %}
+                  {% set fname = c.item.file_name or '' %}
+                  {% set stem = fname.rsplit('.', 1)[0] if fname else '' %}
+                  <tr data-file
+                      data-name="{{ fname }}"
+                      data-size="{{ c.item.size_bytes or 0 }}"
+                      data-score="{{ c.score.total }}"
+                      data-drive="{{ c.item.drive_name or '' }}"
+                      data-path="{{ c.item.file_path or '' }}"
+                      class="{% if c.is_winner %}is-keep{% endif %}">
+                    <td data-col="role">{% if c.is_winner %}KEEP{% else %}extra{% endif %}</td>
+                    <td data-col="title">{{ g.label }}</td>
+                    <td data-col="kind">{{ g.kind }}</td>
+                    <td data-col="drive">{{ c.item.drive_name or '' }}</td>
+                    <td data-col="file" class="mono">{{ fname }}</td>
+                    <td data-col="stem" class="mono">{{ stem }}</td>
+                    <td data-col="ext" class="mono">{{ c.item.extension or '' }}</td>
+                    <td data-col="path" class="mono small">{{ c.item.file_path or '' }}</td>
+                    <td data-col="size" class="num">{{ c.item.size_bytes|filesize }}</td>
+                    <td data-col="score" class="num">{{ '%.1f'|format(c.score.total) }}</td>
+                    <td data-col="summary">{{ c.score.summary }}</td>
+                    <td data-col="res">{% if c.score.width and c.score.height %}{{ c.score.width }}×{{ c.score.height }}{% elif c.score.height %}{{ c.score.height }}p{% else %}—{% endif %}</td>
+                    <td data-col="vcodec">{{ c.score.video_codec or '—' }}</td>
+                    <td data-col="acodec">{{ c.score.audio_codec or '—' }}</td>
+                    <td data-col="source">{{ c.score.source or '—' }}</td>
+                    <td data-col="hdr">{{ c.score.hdr or '—' }}</td>
+                    <td data-col="duration">{% if c.score.duration_s %}{{ (c.score.duration_s / 60)|round(1) }} min{% else %}—{% endif %}</td>
+                    <td data-col="edition">{{ c.identity.edition or '—' }}</td>
+                    <td class="print-hide">
+                      <button type="button" class="btn small danger" data-delete-file
+                              data-path="{{ c.item.file_path or '' }}"
+                              data-name="{{ fname }}"
+                              data-drive="{{ c.item.drive_name or '' }}"
+                              data-size="{{ c.item.size_bytes|filesize }}"
+                              data-keep="{% if c.is_winner %}1{% else %}0{% endif %}"
+                              data-group="{{ g.key }}">Delete</button>
+                    </td>
+                  </tr>
+                {% endfor %}
+                <tr class="group-foot" data-group-foot>
+                  <td data-span colspan="18">
+                    {{ g.copies|length }} files
+                    · extras {{ extra_bytes.n|filesize }}
+                  </td>
+                </tr>
+              </tbody>
+            {% endfor %}
+          </table>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="card table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Kind</th>
+            <th>Copies</th>
+            <th>Keep</th>
+            <th>Score gap</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for g in groups %}
+            <tr>
+              <td>
+                <a href="{{ url_for('group_detail', key=g.key) }}">{{ g.label }}</a>
+                {% if g.mixed_editions %}
+                  <div class="muted small">editions: {{ g.editions|join(', ') }}</div>
+                {% endif %}
+              </td>
+              <td><span class="pill pill-{{ g.kind }}">{{ g.kind }}</span></td>
+              <td>{{ g.copies|length }}</td>
+              <td>
+                {% if g.winner %}
+                  <div>{{ g.winner.score.summary }}</div>
+                  <div class="muted small">{{ g.winner.score.total }} · {{ g.winner.item.drive_name or '' }}</div>
+                {% endif %}
+              </td>
+              <td>
+                <div class="score-num">{{ g.score_gap }}</div>
+                <div class="score-bar"><span style="width: {{ [g.score_gap, 100]|min }}%"></span></div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  {% if view == 'advanced' %}
+    <script src="{{ url_for('static', filename='groups-advanced.js') }}?v={{ adv_v }}" defer></script>
+  {% endif %}
+{% endblock %}

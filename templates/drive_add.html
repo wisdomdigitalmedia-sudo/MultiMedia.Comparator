@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Add drive — Media Comparator{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="crumb"><a href="{{ url_for('index') }}">Dashboard</a> / <a href="{{ url_for('sources_page') }}">Drives</a> / Add</p>
+    <h1>Add a drive</h1>
+    <p class="muted">
+      Local mount on this PC, or a disk on a Windows or Linux media host via the agent.
+    </p>
+  </div>
+</section>
+
+<div class="source-tabs card">
+  <a class="tab {% if source != 'remote' %}active{% endif %}"
+     href="{{ url_for('add_drive', source='local') }}">Mounted path (this PC)</a>
+  <a class="tab {% if source == 'remote' %}active{% endif %}"
+     href="{{ url_for('add_drive', source='remote') }}">Media host (agent)</a>
+</div>
+
+{% set f = form if form is defined and form else {} %}
+
+<form method="post" class="card form" id="drive-form">
+  <input type="hidden" name="source" value="{{ source }}">
+
+  {% if source == 'remote' %}
+    <fieldset class="remote-box">
+      <legend>Connect to the media host</legend>
+      <div class="row-2">
+        <label>
+          Host / IP
+          <input type="text" name="agent_host" class="mono"
+                 value="{{ f.get('agent_host', '') }}"
+                 placeholder="192.168.1.50" autocomplete="on">
+        </label>
+        <label>
+          Port
+          <input type="text" name="agent_port" class="mono"
+                 value="{{ f.get('agent_port', '8766') or '8766' }}"
+                 placeholder="8766">
+        </label>
+      </div>
+      <label>
+        Or full agent URL
+        <input type="text" name="agent_url" class="mono"
+               value="{{ f.get('agent_url', '') }}"
+               placeholder="http://192.168.1.50:8766">
+      </label>
+      <label>
+        Token (optional)
+        <input type="password" name="agent_token" class="mono"
+               value="{{ f.get('agent_token', '') }}"
+               placeholder="only if the agent was started with --token"
+               autocomplete="off">
+      </label>
+      <div class="actions">
+        <button type="submit" name="action" value="list_remote" class="btn primary"
+                data-slow="Listing host drives…">
+          List host drives
+        </button>
+      </div>
+    </fieldset>
+
+    {% if remote_drives %}
+      <div class="remote-results">
+        <h3>Drives on {% if agent_info %}{{ agent_info.get('hostname', 'host') }}{% else %}host{% endif %}</h3>
+        <p class="hint">Click a volume to fill the path. Already-catalogued volumes are marked.</p>
+        <div class="drive-pick-grid">
+          {% for rd in remote_drives %}
+            <button type="button"
+                    class="drive-pick {% if rd.already_added %}already-added{% endif %}"
+                    data-letter="{{ rd.letter or '' }}"
+                    data-path="{{ rd.path or rd.letter or '' }}"
+                    data-label="{{ rd.display|e }}"
+                    {% if rd.already_added %}title="Already in catalog"{% endif %}>
+              <strong>{{ rd.display }}</strong>
+              <span class="mono small">{{ rd.path or rd.letter or '?' }}</span>
+              {% if rd.already_added %}<span class="pill already-pill">In catalog</span>{% endif %}
+              {% if rd.free_bytes is not none and rd.total_bytes %}
+                <span class="muted small">
+                  {{ (rd.free_bytes / 1073741824)|round(1) }} GB free
+                  / {{ (rd.total_bytes / 1073741824)|round(1) }} GB
+                </span>
+              {% endif %}
+            </button>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  {% endif %}
+
+  <label>
+    Display name
+    <input type="text" name="name" required
+           value="{{ f.get('name', '') }}"
+           placeholder="{% if source == 'remote' %}e.g. Movies H{% else %}e.g. Movies{% endif %}">
+  </label>
+  <label>
+    {% if source == 'remote' %}Path on the media host{% else %}Mount path on this PC{% endif %}
+    <input type="text" name="root_path" id="root_path" required class="mono"
+           value="{{ f.get('root_path', '') }}"
+           placeholder="{% if source == 'remote' %}D:/ or D:/Movies{% else %}/mnt/windows-movies{% endif %}">
+  </label>
+  {% if source == 'local' %}
+    <p class="hint">Path must exist and be readable. Mount SMB shares first.</p>
+  {% else %}
+    <p class="hint">Path is on the file host. Windows: <code>D:/</code>. Linux: <code>/mnt/media</code>. Scan is a separate step after add.</p>
+  {% endif %}
+  <label>
+    Notes (optional)
+    <textarea name="notes" rows="2">{{ f.get('notes', '') }}</textarea>
+  </label>
+  <div class="actions">
+    <button type="submit" name="action" value="save" class="btn primary"
+            data-slow="Adding drive…">Add drive</button>
+    <a class="btn" href="{{ url_for('sources_page') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script>
+    document.querySelectorAll(".drive-pick").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var path = (btn.getAttribute("data-path") || "").trim();
+        if (!path) {
+          var letter = (btn.getAttribute("data-letter") || "").trim();
+          if (letter.length === 1 && /[A-Za-z]/.test(letter)) path = letter.toUpperCase() + ":/";
+          else path = letter;
+        }
+        var label = btn.getAttribute("data-label") || path;
+        var pathInput = document.getElementById("root_path");
+        var nameInput = document.querySelector('input[name="name"]');
+        if (pathInput) pathInput.value = path;
+        if (nameInput && !nameInput.value.trim()) nameInput.value = label;
+        document.querySelectorAll(".drive-pick").forEach(function (b) {
+          b.classList.remove("selected");
+        });
+        btn.classList.add("selected");
+      });
+    });
+  </script>
+{% endblock %}

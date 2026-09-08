@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% from "_empty.html" import empty_state %}
+{% block title %}{{ drive.name }} — Media Comparator{% endblock %}
+{% block wrap_class %}wrap-wide{% endblock %}
+{% block content %}
+{% set lq = listing_q %}
+<section class="hero print-hide">
+  <div>
+    <p class="crumb">
+      <a href="{{ url_for('index') }}">Dashboard</a> /
+      <a href="{{ url_for('sources_page') }}">Drives</a> /
+      <a href="{{ url_for('drive_contents', drive_id=drive.id, q=lq.q, kind=lq.kind, depth=depth, per=lq.per) }}">{{ drive.name }}</a>
+      {% for part in crumbs %}
+        / <a href="{{ url_for('drive_contents', drive_id=drive.id, q=lq.q, kind=lq.kind, depth=depth, per=lq.per, prefix=crumbs[:loop.index]|join('/')) }}">{{ part }}</a>
+      {% endfor %}
+    </p>
+    <h1>{{ drive.letter or "" }}{% if drive.letter %} · {% endif %}{{ drive.name }}</h1>
+    <p class="muted">
+      {{ file_total }} file{{ 's' if file_total != 1 else '' }}
+      · {{ total }} row{{ 's' if total != 1 else '' }} at this level
+      {% if drive.capacity_known %} · {{ drive.free_label }} free of {{ drive.total_label }}{% endif %}
+      · {{ drive.root_path }}
+    </p>
+  </div>
+  <div class="actions hero-actions">
+    <button class="btn" type="button" onclick="window.print()">Print</button>
+    <a class="btn primary" href="{{ url_for('drive_pdf', drive_id=drive.id, q=lq.q, kind=lq.kind, depth=depth, prefix=lq.prefix, per=lq.per) }}">Download PDF</a>
+    <form method="post" action="{{ url_for('scan_drive', drive_id=drive.id) }}" class="inline-form"
+          data-slow="Scanning {{ drive.name }}… large libraries can take a long time.">
+      <input type="hidden" name="next" value="{{ url_for('drive_contents', drive_id=drive.id) }}">
+      <button class="btn" type="submit">Scan</button>
+    </form>
+  </div>
+</section>
+
+<p class="print-only">
+  <strong>{{ drive.name }}</strong> · {{ drive.root_path }}
+  · {{ file_total }} files · {{ total }} rows
+  {% if depth %} · {{ depth }} folder level{{ 's' if depth != 1 else '' }}{% endif %}
+  {% if prefix %} · {{ prefix }}{% endif %}
+</p>
+
+<form class="filters card print-hide" method="get">
+  <input type="hidden" name="depth" value="{{ depth }}">
+  <input type="hidden" name="prefix" value="{{ prefix }}">
+  <label>Search
+    <input name="q" value="{{ q }}" placeholder="title or path">
+  </label>
+  <label>Kind
+    <select name="kind">
+      <option value="" {% if not kind %}selected{% endif %}>All</option>
+      <option value="movie" {% if kind == 'movie' %}selected{% endif %}>Movies</option>
+      <option value="episode" {% if kind == 'episode' %}selected{% endif %}>TV</option>
+      <option value="audio" {% if kind == 'audio' %}selected{% endif %}>Audio</option>
+      <option value="other" {% if kind == 'other' %}selected{% endif %}>Other</option>
+    </select>
+  </label>
+  <label>Rows
+    <select name="per">
+      <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+      <option value="250" {% if per_page == 250 %}selected{% endif %}>250</option>
+      <option value="500" {% if per_page == 500 %}selected{% endif %}>500</option>
+      <option value="1000" {% if per_page == 1000 %}selected{% endif %}>1000</option>
+      <option value="all" {% if per_page == 0 %}selected{% endif %}>All</option>
+    </select>
+  </label>
+  <button class="btn" type="submit">Filter</button>
+  {% if q or kind or prefix %}
+    <a class="btn" href="{{ url_for('drive_contents', drive_id=drive.id, depth=depth, per=lq.per) }}">Clear</a>
+  {% endif %}
+</form>
+
+<div class="card depth-bar print-hide">
+  <span class="depth-label">Directory levels</span>
+  <a class="btn small {% if depth <= 0 %}is-disabled{% endif %}"
+     {% if depth > 0 %}href="{{ url_for('drive_contents', drive_id=drive.id, q=lq.q, kind=lq.kind, prefix=lq.prefix, per=lq.per, depth=depth-1) }}"{% endif %}
+     title="Fewer folders — more detail">−</a>
+  <strong class="depth-num">{{ depth }}</strong>
+  <a class="btn small {% if depth >= max_depth %}is-disabled{% endif %}"
+     {% if depth < max_depth %}href="{{ url_for('drive_contents', drive_id=drive.id, q=lq.q, kind=lq.kind, prefix=lq.prefix, per=lq.per, depth=depth+1) }}"{% endif %}
+     title="More folders — hide files underneath">+</a>
+  <span class="muted small">
+    {% if depth == 0 %}
+      Every file is listed.
+    {% elif depth == 1 %}
+      Top folders only (Music, Movies, …).
+    {% elif depth == 2 %}
+      One folder down (artist / movie folder).
+    {% else %}
+      {{ depth }} folders deep — typical album / season folders, not each track.
+    {% endif %}
+  </span>
+  {% if depth != 0 %}
+    <a class="btn small" href="{{ url_for('drive_contents', drive_id=drive.id, q=lq.q, kind=lq.kind, prefix=lq.prefix, per=lq.per, depth=0) }}">Show every file</a>
+  {% endif %}
+  {% if depth != 3 and max_depth >= 3 %}
+    <a class="btn small" href="{{ url_for('drive_contents', drive_id=drive.id, q=lq.q, kind=lq.kind, prefix=lq.prefix, per=lq.per, depth=3) }}">Album / folder view</a>
+  {% endif %}
+</div>
+
+{% if not items and not file_total %}
+  {{ empty_state(
+    "Empty volume",
+    "No titles listed yet",
+    "Scan this drive from here, or clear the filter if you were searching.",
+    none,
+    [
+      {"href": url_for("scan_drive", drive_id=drive.id), "label": "Scan now", "method": "post", "class": "primary", "slow": "Scanning…"},
+      {"href": url_for("index"), "label": "Dashboard", "class": "ghost"}
+    ]
+  ) }}
+{% elif not items %}
+  {{ empty_state(
+    "Nothing at this level",
+    "No rows match",
+    "Go up a folder or show every file.",
+    none,
+    [{"href": url_for("drive_contents", drive_id=drive.id, depth=depth, per=lq.per), "label": "Volume root", "class": "primary"}]
+  ) }}
+{% else %}
+  <div class="pager muted small print-hide">
+    <span>Page {{ page }} / {{ pages }} · {{ total }} rows</span>
+    <span>
+      {% if page > 1 %}<a href="{{ url_for('drive_contents', drive_id=drive.id, q=lq.q, kind=lq.kind, prefix=lq.prefix, depth=depth, per=lq.per, page=page-1) }}">Prev</a>{% endif %}
+      {% if page < pages %}<a href="{{ url_for('drive_contents', drive_id=drive.id, q=lq.q, kind=lq.kind, prefix=lq.prefix, depth=depth, per=lq.per, page=page+1) }}">Next</a>{% endif %}
+    </span>
+  </div>
+  <div class="card table-wrap adv-scroll">
+    <table class="data adv-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Title</th>
+          <th>Kind</th>
+          <th>Ext</th>
+          <th>Size</th>
+          <th>Path</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+          <tr class="{% if item.is_folder %}folder-row{% endif %}">
+            <td class="num">{{ loop.index + ((page - 1) * (per_page if per_page else total)) }}</td>
+            <td>
+              {% if item.is_folder %}
+                <a href="{{ url_for('drive_contents', drive_id=drive.id, q=lq.q, kind=lq.kind, per=lq.per, depth=depth, prefix=item.relative_path) }}">{{ item.display_title }}</a>
+                <span class="muted small"> · {{ item.file_count }} file{{ 's' if item.file_count != 1 else '' }}</span>
+              {% else %}
+                {{ item.display_title or item.file_name }}
+              {% endif %}
+            </td>
+            <td>
+              {% if item.is_folder %}
+                <span class="pill">folder</span>
+              {% else %}
+                <span class="pill pill-{{ item.kind }}">{{ item.kind }}</span>
+              {% endif %}
+            </td>
+            <td class="mono">{% if not item.is_folder %}{{ (item.extension or '')|replace('.', '') }}{% endif %}</td>
+            <td class="num">{{ item.size_bytes|filesize }}</td>
+            <td class="mono small">{{ item.relative_path }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}

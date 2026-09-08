@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% from "_empty.html" import empty_state %}
+{% block title %}Dashboard — Media Comparator{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Library overview</p>
+    <h1>Space and copies, at a glance</h1>
+    <p class="muted">
+      Free space from the catalog and the media-host agent.
+      Missing sizes are requested automatically — no Scan / SMART click needed.
+      Duplicate ranking waits until you run a compare.
+    </p>
+  </div>
+  <div class="actions hero-actions">
+    <a class="btn" href="{{ url_for('setup_page') }}">Setup wizard</a>
+    <a class="btn" href="{{ url_for('sources_page') }}">Manage drives</a>
+    {% if dash.has_catalog %}
+      <form method="post" action="{{ url_for('import_catalog') }}" class="inline-form" data-slow="Refreshing library…">
+        <button type="submit" class="btn">Refresh library</button>
+      </form>
+    {% endif %}
+    <form method="post" action="{{ url_for('run_compare') }}" class="inline-form" data-slow="Comparing the library…">
+      <button type="submit" class="btn primary" {% if not library.item_count %}disabled{% endif %}>Find duplicates</button>
+    </form>
+  </div>
+</section>
+
+<div data-dashboard data-ready="0"
+     data-known="{{ space.known_count }}"
+     data-unknown="{{ space.unknown_count }}">
+  <div class="dash-skel" aria-hidden="true">
+    <div class="kpi-grid">
+      <div class="skel skel-kpi"></div>
+      <div class="skel skel-kpi"></div>
+      <div class="skel skel-kpi"></div>
+      <div class="skel skel-kpi"></div>
+    </div>
+    <div class="dash-grid">
+      <div class="card"><div class="skel skel-ring"></div></div>
+      <div class="card"><div class="skel skel-chart"></div></div>
+    </div>
+  </div>
+
+  <p class="muted small hint" data-capacity-status hidden>Reading sizes from the media host…</p>
+  <div class="dash-live">
+    <div class="kpi-grid">
+      <article class="card kpi tone-{{ space.tone }}">
+        <dt>Free across known drives</dt>
+        <dd><span data-count-free>{{ space.free_pct if space.free_pct is not none else "—" }}{% if space.free_pct is not none %}%{% endif %}</span></dd>
+        <p class="sub" data-kpi-free-sub>{{ space.free_label }} of {{ space.total_label }}</p>
+      </article>
+      <article class="card kpi">
+        <dt>Media items</dt>
+        <dd>{{ library.item_count }}</dd>
+        <p class="sub">{{ library.movies }} movies · {{ library.episodes }} episodes</p>
+      </article>
+      <article class="card kpi">
+        <dt>Duplicate groups</dt>
+        <dd>{{ group_count }}</dd>
+        <p class="sub">{{ extra_copies }} extra copies ranked</p>
+      </article>
+      <article class="card kpi">
+        <dt>Drives reporting size</dt>
+        <dd data-kpi-known>{{ space.known_count }}/{{ space.drive_count }}</dd>
+        <p class="sub" data-kpi-unknown>{{ space.unknown_count }} still unknown</p>
+      </article>
+    </div>
+
+    {% if not dash.has_catalog and not library.item_count %}
+      {{ empty_state(
+        "No library yet",
+        "Your drives will live here",
+        "Run Setup to pick Linux/Windows/Mac, or add a media-host volume / local folder. Free-space charts appear once a drive reports a real size — we will not invent numbers.",
+        "This empty panel is the starting state, not an error.",
+        empty_start
+      ) }}
+    {% elif not dash.known_drives %}
+      {{ empty_state(
+        "Size unknown",
+        "Titles are in. Capacity is not.",
+        "The catalog listed drives, but none have a total size yet. This page asks the media-host agent for those numbers automatically.",
+        "If this stays empty, the media-host agent is offline. Zero-byte reports stay unknown so a blank disk is never drawn as “full.”",
+        empty_nosize
+      ) }}
+    {% else %}
+      <div class="dash-grid">
+        <article class="card chart-card">
+          <div class="section-head">
+            <h2>Pool free</h2>
+          </div>
+          <div class="ring-wrap">
+            <div class="ring-stage" data-ring>
+              <svg class="ring" viewBox="0 0 220 220" aria-hidden="true"></svg>
+              <div class="ring-center">
+                <strong>{{ "%.0f"|format(space.free_pct) if space.free_pct is not none else "—" }}{% if space.free_pct is not none %}%{% endif %}</strong>
+                <span>free of known pool</span>
+              </div>
+            </div>
+            <p class="legend">
+              <span><i class="swatch free"></i>Free {{ space.free_label }}</span>
+              <span><i class="swatch used"></i>Used {{ space.used_label }}</span>
+            </p>
+            <p class="muted small hint">
+              Sums only the {{ space.known_count }} volume{{ 's' if space.known_count != 1 else '' }} that reported a size.
+            </p>
+          </div>
+        </article>
+
+        <article class="card chart-card">
+          <div class="section-head">
+            <h2>Free space by drive</h2>
+            <p class="muted small">Taller bar = more free bytes</p>
+          </div>
+          <div class="chart-frame" data-cols>
+            <svg class="cols-svg"></svg>
+          </div>
+          <p class="legend">
+            <span><i class="swatch free"></i>Comfortable</span>
+            <span><i class="swatch warn"></i>Under 12% free</span>
+            <span><i class="swatch crit"></i>4% or less</span>
+          </p>
+        </article>
+      </div>
+    {% endif %}
+
+    {% if dash.drives %}
+      <article class="card">
+        <div class="section-head">
+          <h2>Volumes</h2>
+          <p class="muted small"><a href="{{ url_for('sources_page') }}">Manage</a> · used fill · remaining labeled in text</p>
+        </div>
+        <div class="drive-list">
+          {% for d in dash.drives %}
+            <div class="drive-row drive-row-manage" data-drive-id="{{ d.id }}">
+              <div class="drive-letter">{{ d.letter or "—" }}</div>
+              <div>
+                <div class="drive-meta">
+                  <strong><a href="{{ url_for('drive_contents', drive_id=d.id) }}">{{ d.name }}</a></strong>
+                  <span class="amt">
+                    {% if d.capacity_known %}
+                      {{ d.free_label }} free of {{ d.total_label }}
+                    {% else %}
+                      Size not reported
+                    {% endif %}
+                  </span>
+                </div>
+                <div class="meter tone-{{ d.tone }}"
+                     data-meter="{{ d.used_pct if d.capacity_known else '' }}"
+                     role="img"
+                     aria-label="{% if d.capacity_known %}{{ d.name }} {{ d.used_pct }}% used{% else %}{{ d.name }} capacity unknown{% endif %}">
+                  <i></i>
+                </div>
+                <p class="muted small">
+                  {{ d.item_count }} titles
+                  {% if d.volume_label %} · {{ d.volume_label }}{% endif %}
+                  {% if d.hardware_label %} · {{ d.hardware_label }}{% endif %}
+                </p>
+              </div>
+              <div class="drive-actions">
+                <a class="btn small" href="{{ url_for('drive_contents', drive_id=d.id) }}">Contents</a>
+                <a class="btn small" href="{{ url_for('drive_pdf', drive_id=d.id) }}">PDF</a>
+                <form method="post" action="{{ url_for('delete_drive', drive_id=d.id) }}" class="inline-form"
+                      onsubmit="return confirm('Remove “{{ d.name }}” from the catalog? Files on disk are not touched.');">
+                  <input type="hidden" name="next" value="{{ url_for('index') }}">
+                  <button class="btn small danger" type="submit">Remove</button>
+                </form>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </article>
+    {% endif %}
+
+    {% if tightest %}
+      <article class="card">
+        <div class="section-head"><h2>Tightest volumes</h2></div>
+        <p class="muted">These reported under 12% free. Extra copies here cost the most.</p>
+        <ul>
+          {% for d in tightest %}
+            <li><a href="{{ url_for('drive_contents', drive_id=d.id) }}"><strong>{{ d.name }}</strong></a> — {{ d.free_label }} free ({{ "%.1f"|format(d.free_pct) }}%)</li>
+          {% endfor %}
+        </ul>
+      </article>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script>window.__DASHBOARD__ = {{ dash_json|safe }};</script>
+{% endblock %}

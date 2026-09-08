@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% from "_empty.html" import empty_state %}
+{% block title %}Drives — Media Comparator{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="crumb"><a href="{{ url_for('index') }}">Dashboard</a> / Drives</p>
+    <h1>Drives</h1>
+    <p class="muted">
+      The library of record. Add or remove volumes here — files on disk are never deleted.
+    </p>
+  </div>
+  <div class="actions hero-actions">
+    <a class="btn" href="{{ url_for('add_drive', source='local') }}">Add local path</a>
+    <a class="btn" href="{{ url_for('setup_page') }}">Setup wizard</a>
+    <a class="btn primary" href="{{ url_for('add_drive', source='remote') }}">Add media host</a>
+  </div>
+</section>
+
+{% if drives %}
+  <article class="card">
+    <div class="section-head">
+      <h2>Catalog volumes</h2>
+      <p class="muted small">{{ drives|length }} drive{{ 's' if drives|length != 1 else '' }}</p>
+    </div>
+    <div class="drive-list">
+      {% for d in drives %}
+        <div class="drive-row drive-row-manage">
+          <div class="drive-letter">{{ d.letter or "—" }}</div>
+          <div>
+            <div class="drive-meta">
+              <strong><a href="{{ url_for('drive_contents', drive_id=d.id) }}">{{ d.name }}</a></strong>
+              <span class="amt">
+                {% if d.capacity_known %}
+                  {{ d.free_label }} free of {{ d.total_label }}
+                {% else %}
+                  Size not reported
+                {% endif %}
+              </span>
+            </div>
+            <div class="meter tone-{{ d.tone }}"
+                 data-meter="{{ d.used_pct if d.capacity_known else '' }}"
+                 role="img"
+                 aria-label="{% if d.capacity_known %}{{ d.name }} {{ d.used_pct }}% used{% else %}{{ d.name }} capacity unknown{% endif %}">
+              <i></i>
+            </div>
+            <p class="muted small">
+              {{ d.item_count }} titles
+              · {{ d.source_type }}
+              {% if d.volume_label %} · {{ d.volume_label }}{% endif %}
+              {% if d.root_path %} · <span class="mono">{{ d.root_path }}</span>{% endif %}
+            </p>
+          </div>
+          <div class="drive-actions">
+            <a class="btn small" href="{{ url_for('drive_contents', drive_id=d.id) }}">Contents</a>
+            <a class="btn small" href="{{ url_for('drive_pdf', drive_id=d.id) }}">PDF</a>
+            <form method="post" action="{{ url_for('scan_drive', drive_id=d.id) }}" class="inline-form"
+                  data-slow="Scanning {{ d.name }}… large libraries can take a long time.">
+              <button class="btn small" type="submit">Scan</button>
+            </form>
+            <form method="post" action="{{ url_for('delete_drive', drive_id=d.id) }}" class="inline-form"
+                  onsubmit="return confirm('Remove “{{ d.name }}” from the catalog? Files on disk are not touched.');">
+              <button class="btn small danger" type="submit">Remove</button>
+            </form>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </article>
+{% else %}
+  {{ empty_state(
+    "No drives yet",
+    "Nothing in the catalog",
+    "Add a remote volume via the media-host agent (Windows or Linux), or a folder mounted on this PC.",
+    "Removing a drive later only drops catalog rows — never files.",
+    empty_drives
+  ) }}
+{% endif %}
+{% endblock %}

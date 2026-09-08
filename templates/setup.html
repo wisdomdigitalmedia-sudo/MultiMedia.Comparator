@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Setup — Media Comparator{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Any OS pair</p>
+    <h1>What kind of setup is this?</h1>
+    <p class="muted">
+      Linux catalog + Windows file server, Linux to Linux, Windows to Windows,
+      Windows to Linux, or everything on one PC. We detect this machine, scan
+      the LAN, and tell you what to install where.
+    </p>
+  </div>
+  <div class="actions hero-actions">
+    <button class="btn" id="btn-scan" type="button">Scan this network</button>
+    <a class="btn" href="{{ url_for('download_host_setup') }}">Download host installer</a>
+  </div>
+</section>
+
+<article class="card" id="ask-card">
+  <p class="eyebrow">This computer</p>
+  <p class="muted small" id="machine-line">Detecting…</p>
+
+  <h2 class="setup-q">1. This machine is</h2>
+  <div class="choice-grid" id="role-choices">
+    <button type="button" class="choice on" data-role="catalog"><strong>The catalog PC</strong> I browse the library here (Comparator).</button>
+    <button type="button" class="choice" data-role="files"><strong>The media file server</strong> The disks live here (USB docks / NAS / library).</button>
+    <button type="button" class="choice" data-role="both"><strong>Both</strong> Files and the app are on this same computer.</button>
+  </div>
+
+  <h2 class="setup-q">2. The media files are on</h2>
+  <div class="choice-grid" id="files-choices">
+    <button type="button" class="choice" data-files="this"><strong>This computer</strong> Local disks or folders I can already open.</button>
+    <button type="button" class="choice on" data-files="windows"><strong>A Windows PC</strong> Unshared letters like D:/ E:/ — needs the Windows agent.</button>
+    <button type="button" class="choice" data-files="linux"><strong>A Linux PC / NAS</strong> Needs the same agent on that Linux box.</button>
+    <button type="button" class="choice" data-files="mixed"><strong>Mixed</strong> Some folders here, some on another PC.</button>
+  </div>
+  <div class="actions">
+    <button class="btn primary" id="btn-plan" type="button">Suggest install</button>
+  </div>
+</article>
+
+<article class="card" id="scan-card">
+  <p class="eyebrow">LAN</p>
+  <h2 class="setup-q">What we can see on this network</h2>
+  <p class="muted small" id="scan-status">Checking nearby devices for an agent (port 8766) or Comparator (8767).</p>
+  <div id="peer-list"></div>
+</article>
+
+<article class="card" id="plan-card" hidden>
+  <p class="eyebrow">Recommended</p>
+  <h2 class="setup-q" id="plan-title">—</h2>
+  <p class="muted" id="plan-summary"></p>
+  <h3 class="setup-h">On this computer</h3>
+  <ol class="plan-ol" id="plan-here"></ol>
+  <div id="plan-other-wrap">
+    <h3 class="setup-h">On the other computer</h3>
+    <ol class="plan-ol" id="plan-other"></ol>
+  </div>
+  <h3 class="setup-h">Then</h3>
+  <ol class="plan-ol" id="plan-then"></ol>
+  <p class="muted small" id="plan-agent" hidden></p>
+  <div class="actions" id="plan-actions" hidden>
+    <a class="btn primary" href="{{ url_for('download_host_setup') }}">Download Media-Host-Setup</a>
+    <a class="btn" href="{{ url_for('add_drive', source='remote') }}">Add media host drive</a>
+  </div>
+</article>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script>
+  const $ = (id) => document.getElementById(id);
+  let peers = [];
+  let role = "catalog";
+  let filesWhere = "windows";
+
+  function pick(group, attr, value) {
+    group.querySelectorAll(".choice").forEach((b) => {
+      b.classList.toggle("on", b.getAttribute(attr) === value);
+    });
+  }
+  $("role-choices").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-role]");
+    if (!b) return;
+    role = b.getAttribute("data-role");
+    pick($("role-choices"), "data-role", role);
+  });
+  $("files-choices").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-files]");
+    if (!b) return;
+    filesWhere = b.getAttribute("data-files");
+    pick($("files-choices"), "data-files", filesWhere);
+  });
+
+  function renderPeers(list) {
+    if (!list.length) {
+      $("peer-list").innerHTML = "<p class='muted small'>No Comparator or media-host agent answered on this subnet yet.</p>";
+      return;
+    }
+    $("peer-list").innerHTML = list.map((p) => {
+      const name = (p.this_machine ? "This PC · " : "") + (p.hostname ? `${p.hostname} · ${p.ip}` : p.ip);
+      const url = p.agent ? p.agent_url : p.catalog_url;
+      return `<div class="peer"><span><strong>${name}</strong><br><span class="muted small">${p.detail || ""}</span></span><code class="mono">${url}</code></div>`;
+    }).join("");
+  }
+
+  function renderPlan(plan) {
+    $("plan-card").hidden = false;
+    $("plan-title").textContent = plan.title || "Plan";
+    $("plan-summary").textContent = plan.summary || "";
+    const ol = (id, items) => {
+      $(id).innerHTML = (items || []).map((s) => `<li>${s}</li>`).join("") || "<li class='muted'>Nothing extra.</li>";
+    };
+    ol("plan-here", plan.this_machine);
+    ol("plan-other", plan.other_machine);
+    ol("plan-then", plan.then);
+    $("plan-other-wrap").hidden = !(plan.other_machine && plan.other_machine.length);
+    const ag = $("plan-agent");
+    if (plan.suggested_agent) {
+      ag.hidden = false;
+      ag.textContent = "Suggested agent address: " + plan.suggested_agent;
+    } else ag.hidden = true;
+    const needHost = (plan.other_machine && plan.other_machine.length) || plan.needs_agent_here;
+    $("plan-actions").hidden = !needHost;
+  }
+
+  async function runScan(quick) {
+    $("btn-scan").disabled = true;
+    $("scan-status").textContent = quick
+      ? "Checking devices this PC already talks to…"
+      : "Scanning this subnet for ports 8766 (agent) and 8767 (Comparator)…";
+    try {
+      const res = await fetch(quick ? "/api/setup/lan-scan?quick=1" : "/api/setup/lan-scan");
+      const data = await res.json();
+      peers = data.peers || [];
+      $("scan-status").textContent = peers.length
+        ? `Found ${peers.length} media service${peers.length === 1 ? "" : "s"}${quick ? " nearby. Click Scan this network for the whole subnet." : "."}`
+        : (quick
+          ? "No agent or Comparator on nearby devices yet. Click Scan this network to probe the whole subnet."
+          : "Scan finished — nothing on 8766/8767 yet (start the other PC’s installer, then scan again).");
+      renderPeers(peers);
+    } catch (err) {
+      $("scan-status").textContent = "Scan failed: " + err;
+    }
+    $("btn-scan").disabled = false;
+  }
+
+  $("btn-scan").addEventListener("click", () => runScan(false));
+  $("btn-plan").addEventListener("click", async () => {
+    const res = await fetch("/api/setup/plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role, files_where: filesWhere, peers }),
+    });
+    const plan = await res.json();
+    renderPlan(plan);
+    $("plan-card").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  fetch("/api/setup/machine").then((r) => r.json()).then((m) => {
+    $("machine-line").textContent = `${m.os_label} · ${m.hostname || "this PC"} · LAN ${m.lan_ip}${m.subnet ? " (" + m.subnet + ")" : ""} · Python ${m.python}`;
+    if (m.suggested_files_where) {
+      filesWhere = m.suggested_files_where;
+      pick($("files-choices"), "data-files", filesWhere);
+    }
+  }).catch(() => { $("machine-line").textContent = "Could not read this computer."; });
+  runScan(true);
+  </script>
+{% endblock %}

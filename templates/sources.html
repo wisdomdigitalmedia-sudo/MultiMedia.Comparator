@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% from "_empty.html" import empty_state %}
+{% block title %}Sources — Media Comparator{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="crumb"><a href="{{ url_for('index') }}">Dashboard</a> / Sources</p>
+    <h1>Media sources</h1>
+    <p class="muted">Entertainment.Servers catalog and any local folders you add.</p>
+  </div>
+</section>
+
+<div class="card">
+  <h2>Add a local folder</h2>
+  <form method="post" action="{{ url_for('add_folder') }}" class="form" data-slow="Scanning folder…">
+    <label>Name
+      <input name="name" placeholder="Movies">
+    </label>
+    <label>Path
+      <input name="path" class="mono" required placeholder="/mnt/win-movies">
+    </label>
+    <p class="hint">Known library folders (Movies, TV Shows, Music) are scanned; junk folders are skipped.</p>
+    <button type="submit" class="btn primary">Scan folder</button>
+  </form>
+</div>
+
+{% if catalog_path %}
+  <div class="card">
+    <h2>Entertainment.Servers catalog</h2>
+    <p class="path mono">{{ catalog_path }}</p>
+    <form method="post" action="{{ url_for('import_catalog') }}" data-slow="Importing catalog…">
+      <button type="submit" class="btn primary">Import / refresh catalog</button>
+    </form>
+  </div>
+{% endif %}
+
+{% if sources %}
+  <div class="card table-wrap">
+    <table class="data">
+      <thead>
+        <tr><th>Name</th><th>Type</th><th>Path</th><th>Items</th><th>Scanned</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for s in sources %}
+          <tr>
+            <td>{{ s.name }}</td>
+            <td><span class="pill">{{ s.kind }}</span></td>
+            <td class="mono small">{{ s.root_path }}</td>
+            <td>{{ s.item_count }}</td>
+            <td class="muted small">{{ s.last_scanned_at or "—" }}</td>
+            <td>
+              <form method="post" action="{{ url_for('delete_source', source_id=s.id) }}" class="inline-form"
+                    onsubmit="return confirm('Remove this source from the comparator? Files on disk are not touched.');">
+                <button class="btn danger" type="submit">Remove</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  {{ empty_state(
+    "No sources attached",
+    "Nothing is being read yet",
+    "A source is a catalog or a folder this app is allowed to scan. Drives can still show free space from Entertainment.Servers before you import titles.",
+    "Removing a source later only drops comparator rows — never files.",
+    empty_sources
+  ) }}
+{% endif %}
+{% endblock %}

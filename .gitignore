@@ -1,0 +1,31 @@
+# Python
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local catalogs and downloaded binaries — never commit
+data/*
+!data/.gitkeep
+tools/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.keep-workspace
+*.log
+.idea/
+.vscode/
+
+# Generated
+*.pdf

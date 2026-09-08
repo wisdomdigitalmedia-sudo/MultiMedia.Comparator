@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ group.label }} — Media Comparator{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="crumb"><a href="{{ url_for('index') }}">Dashboard</a> /
+      <a href="{{ url_for('groups_page') }}">Duplicates</a></p>
+    <h1>{{ group.label }}</h1>
+    <p class="muted">
+      <span class="pill pill-{{ group.kind }}">{{ group.kind }}</span>
+      {{ group.copies|length }} copies
+      · score gap {{ group.score_gap }}
+      {% if group.mixed_editions %} · mixed editions: {{ group.editions|join(', ') }}{% endif %}
+    </p>
+  </div>
+</section>
+
+{% for c in group.copies %}
+  <article class="card">
+    <div class="actions" style="justify-content:space-between">
+      <div>
+        {% if c.is_winner %}
+          <span class="pill pill-keep">KEEP — best overall</span>
+        {% else %}
+          <span class="pill pill-extra">lower quality</span>
+        {% endif %}
+        <span class="pill pill-{{ group.kind }}">{{ c.item.kind }}</span>
+        {% if c.identity.edition %}<span class="pill">{{ c.identity.edition }}</span>{% endif %}
+        {% if c.score.is_3d %}<span class="pill">3D</span>{% endif %}
+        {% if c.score.probed %}<span class="pill pill-probed">deep-scanned</span>{% endif %}
+      </div>
+      <div class="score-num">{{ '%.1f'|format(c.score.total) }}</div>
+    </div>
+    <div class="score-bar {% if c.is_winner %}winner{% endif %}">
+      <span style="width: {{ [c.score.total, 100]|min }}%"></span>
+    </div>
+    <p><strong>{{ c.score.summary }}</strong></p>
+    <p class="mono">{{ c.item.file_name }}</p>
+    <p class="copy-path">{{ c.item.drive_name or '' }} · {{ c.item.file_path }}</p>
+    <p class="muted small">
+      {{ c.item.size_bytes|filesize }}
+      {% if c.score.duration_s %} · {{ (c.score.duration_s / 60)|round(1) }} min{% endif %}
+    </p>
+    <p class="muted small">{{ c.score.reasons|join(' · ') }}</p>
+    <div class="actions print-hide">
+      <button type="button" class="btn small danger" data-delete-file
+              data-path="{{ c.item.file_path or '' }}"
+              data-name="{{ c.item.file_name or '' }}"
+              data-drive="{{ c.item.drive_name or '' }}"
+              data-size="{{ c.item.size_bytes|filesize }}"
+              data-keep="{% if c.is_winner %}1{% else %}0{% endif %}"
+              data-group="{{ group.key }}">
+        Delete this copy
+      </button>
+    </div>
+    <dl class="breakdown">
+      {% for name, pts in c.score.breakdown.items() %}
+        <dt>{{ name.replace('_', ' ') }}</dt>
+        <dd>
+          <div class="score-bar"><span style="width: {{ [pts * 4, 100]|min }}%"></span></div>
+        </dd>
+        <dd class="score-num">{{ pts }}</dd>
+      {% endfor %}
+    </dl>
+  </article>
+{% endfor %}
+{% endblock %}

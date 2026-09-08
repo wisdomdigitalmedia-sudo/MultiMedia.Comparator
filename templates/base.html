@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Media Comparator{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_v }}">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="shell-top">
+    <a class="brand" href="{{ url_for('index') }}">
+      <span class="brand-mark">MC</span>
+      <span class="brand-copy">
+        <strong>Media Comparator</strong>
+        <span>library · best copy · local</span>
+      </span>
+    </a>
+    <nav class="nav-desk" data-nav-desk aria-label="Primary">
+      <span class="nav-glider" aria-hidden="true"></span>
+      <a href="{{ url_for('index') }}" {% if nav == 'index' %}aria-current="page"{% endif %}>Dashboard</a>
+      <a href="{{ url_for('groups_page') }}" {% if nav in ('groups_page', 'group_detail') %}aria-current="page"{% endif %}>Duplicates</a>
+      <a href="{{ url_for('sources_page') }}" {% if nav in ('sources_page', 'add_drive', 'drive_contents', 'drive_pdf') %}aria-current="page"{% endif %}>Drives</a>
+      <a href="{{ url_for('setup_page') }}" {% if nav == 'setup_page' %}aria-current="page"{% endif %}>Setup</a>
+      <a href="{{ url_for('help_page') }}" {% if nav == 'help_page' %}aria-current="page"{% endif %}>Guide</a>
+    </nav>
+  </header>
+
+  <nav class="nav-dock" aria-label="Primary mobile">
+    <a href="{{ url_for('index') }}" {% if nav == 'index' %}aria-current="page"{% endif %}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/>
+        <rect x="13" y="10" width="8" height="11" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/>
+      </svg>
+      Home
+    </a>
+    <a href="{{ url_for('groups_page') }}" {% if nav in ('groups_page', 'group_detail') %}aria-current="page"{% endif %}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/>
+        <path d="M14 6h6M4 18h6"/>
+      </svg>
+      Dupes
+    </a>
+    <a href="{{ url_for('sources_page') }}" {% if nav in ('sources_page', 'add_drive', 'drive_contents', 'drive_pdf') %}aria-current="page"{% endif %}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 9h16"/>
+      </svg>
+      Drives
+    </a>
+    <a href="{{ url_for('setup_page') }}" {% if nav == 'setup_page' %}aria-current="page"{% endif %}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 3v2.2M12 18.8V21M4.2 6.2l1.6 1.6M18.2 16.2l1.6 1.6M3 12h2.2M18.8 12H21M4.2 17.8l1.6-1.6M18.2 7.8l1.6-1.6"/>
+      </svg>
+      Setup
+    </a>
+    <a href="{{ url_for('help_page') }}" {% if nav == 'help_page' %}aria-current="page"{% endif %}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.2 2.4c-.8.3-1.2.8-1.2 1.6V14"/>
+        <circle cx="12" cy="17" r=".6" fill="currentColor"/>
+      </svg>
+      Guide
+    </a>
+  </nav>
+
+  <main id="main" class="wrap page-enter {% block wrap_class %}{% endblock %}">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flashes">
+          {% for cat, msg in messages %}
+            <li class="flash flash-{{ cat }}">{{ msg }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="foot">
+    Extra copies are deleted only after you confirm the exact path · KEEP is recommended, not automatic
+  </footer>
+
+  <div class="work-veil" data-veil aria-hidden="true" role="status" aria-live="polite">
+    <div class="card work-card">
+      <div class="work-mark" aria-hidden="true">
+        <svg viewBox="0 0 120 120">
+          <circle class="wm-track" cx="60" cy="60" r="48"/>
+          <g class="wm-spin-g">
+            <circle class="wm-spin" cx="60" cy="60" r="48"/>
+          </g>
+          <g class="wm-spin-g wm-spin-g-2">
+            <circle class="wm-spin wm-spin-2" cx="60" cy="60" r="34"/>
+          </g>
+          <circle class="wm-core" cx="60" cy="60" r="8"/>
+        </svg>
+      </div>
+      <p class="eyebrow">Processing</p>
+      <h2 data-veil-title>Working…</h2>
+      <p class="muted" data-veil-copy>Stay on this page. The overlay means the app is running — not the browser tab spinner.</p>
+      <p class="work-elapsed" data-veil-elapsed></p>
+    </div>
+  </div>
+
+  <div class="work-veil" data-del-modal aria-hidden="true" role="dialog" aria-labelledby="del-title">
+    <div class="card work-card del-card">
+      <div data-del-step="1">
+        <p class="eyebrow">Warning</p>
+        <h2 id="del-title">This file will be permanently deleted</h2>
+        <p>It is erased from the disk, not just hidden from this list. Recycle Bin is not used.</p>
+        <p class="del-keep" data-del-keep hidden>This is the <strong>KEEP</strong> copy — the one ranked best overall.</p>
+        <p class="mono" data-del-name></p>
+        <p class="copy-path" data-del-path></p>
+        <p class="muted small" data-del-meta></p>
+        <div class="actions">
+          <button type="button" class="btn" data-del-cancel>Cancel</button>
+          <button type="button" class="btn danger" data-del-continue>Continue</button>
+        </div>
+      </div>
+      <div data-del-step="2" hidden>
+        <p class="eyebrow">Confirm the file</p>
+        <h2>Look at this path again</h2>
+        <p>If this is not the copy you meant, cancel. This cannot be undone.</p>
+        <p class="del-keep" data-del-keep-2 hidden>You are about to delete the <strong>KEEP</strong> copy.</p>
+        <p class="mono" data-del-name-2></p>
+        <p class="copy-path" data-del-path-2></p>
+        <p class="muted small" data-del-meta-2></p>
+        <form method="post" action="{{ url_for('delete_copy') }}" data-del-form>
+          <input type="hidden" name="path">
+          <input type="hidden" name="confirm_path">
+          <input type="hidden" name="group_key">
+          <input type="hidden" name="next">
+          <input type="hidden" name="confirm_keep" value="" data-del-keep-field>
+          <label class="del-ack">
+            <input type="checkbox" name="ack" value="yes" required>
+            I understand this exact file will be deleted from disk
+          </label>
+          <div class="actions">
+            <button type="button" class="btn" data-del-cancel>Cancel</button>
+            <button type="submit" class="btn danger">Delete this file</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {% block scripts %}
+    <script src="{{ url_for('static', filename='dashboard.js') }}?v={{ js_v }}" defer></script>
+  {% endblock %}
+</body>
+</html>
