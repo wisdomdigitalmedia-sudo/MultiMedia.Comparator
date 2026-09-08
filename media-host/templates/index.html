@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% block title %}Drives — Media Catalog{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <h1>Your drives</h1>
+    <p class="muted">
+      {{ drives|length }} drive{{ 's' if drives|length != 1 else '' }} ·
+      {{ total_items }} media item{{ 's' if total_items != 1 else '' }} catalogued
+    </p>
+  </div>
+  <div class="actions hero-actions">
+    {% if drives %}
+      <form method="post" action="{{ url_for('scan_all_drives') }}" id="scan-all-form" class="inline-form">
+        <button type="submit" class="btn primary" id="scan-all-btn"
+                title="Scan every drive for media (can take a long time)">Scan all</button>
+      </form>
+      <div class="export-menu" id="export-all-menu">
+        <button type="button" class="btn export-menu-toggle" aria-haspopup="true" aria-expanded="false">
+          Export all ▾
+        </button>
+        <div class="export-menu-panel" hidden role="menu">
+          <a role="menuitem" href="{{ url_for('export_all_pdf') }}">PDF — all drives</a>
+          <a role="menuitem" href="{{ url_for('export_all_ods') }}">ODS — all drives</a>
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('refresh_smart_all') }}" class="inline-form">
+        <button type="submit" class="btn" title="Query S.M.A.R.T. / disk health for every drive">Check SMART all</button>
+      </form>
+    {% endif %}
+    <a class="btn" href="{{ url_for('download_agent_pack') }}" title="Click-and-run installer for the Windows or Linux media host">Host installer</a>
+    <a class="btn primary" href="{{ url_for('add_drive') }}">+ Add drive path</a>
+  </div>
+</section>
+<p id="scan-all-progress" class="muted small" hidden style="margin:-0.5rem 0 1rem">
+  Scanning all drives… large libraries can take a long time. Leave this tab open.
+</p>
+
+{% if not drives %}
+  <div class="empty card">
+    <h2>No drives yet</h2>
+    <p>Mount a Windows/NAS share on this PC, then add the mount path here.</p>
+    <pre class="code"># example — mount a Windows share
+sudo mkdir -p /mnt/windows-movies
+sudo mount -t cifs //192.168.1.50/Movies /mnt/windows-movies \
+  -o username=YOU,uid=$(id -u),gid=$(id -g)
+
+# then add path: /mnt/windows-movies</pre>
+    <p><a href="{{ url_for('help_page') }}">Full setup help →</a></p>
+  </div>
+{% else %}
+  <div class="drive-grid">
+    {% for d in drives %}
+      <article class="card drive-card hw-{{ d.hardware_type or 'unknown' }}">
+        <div class="drive-card-top">
+          {% include "_drive_type_graphic.html" %}
+          <div class="drive-card-title">
+            <h2><a href="{{ url_for('drive_detail', drive_id=d.id) }}">{{ d.name }}</a></h2>
+            <div class="status-row">
+              {% if d.is_remote %}
+                <span class="pill pill-remote">Windows agent</span>
+              {% else %}
+                <span class="pill">local</span>
+              {% endif %}
+              <span class="pill hw-pill hw-{{ d.hardware_type or 'unknown' }}">{{ d.hardware_label or 'Unknown' }}</span>
+              {% if d.product_id and d.product_id not in ('unknown', 'portable_generic', 'desktop_external', 'internal', 'ssd_stick', 'nvme', 'network') %}
+                <span class="pill product-pill">{{ d.product_label }}</span>
+              {% endif %}
+            </div>
+            <div class="status-row">
+              {% if d.smart_status %}
+                <span class="pill smart-{{ d.smart_status }}"
+                      title="{{ d.smart_status_raw or '' }}{% if d.smart_detail %} — {{ d.smart_detail[:200] }}{% endif %}">
+                  SMART: {{ d.smart_status|smart_label }}{% if d.smart_temperature_c is not none %} · {{ d.smart_temperature_c }}°C{% endif %}
+                </span>
+              {% else %}
+                <span class="pill smart-unknown">SMART: —</span>
+              {% endif %}
+              {% if d.sector_attrs_available and (
+                   (d.sector_pending and d.sector_pending > 0)
+                   or (d.sector_uncorrectable and d.sector_uncorrectable > 0)
+                   or (d.sector_reallocated and d.sector_reallocated > 0)
+                   or (d.nvme_media_errors and d.nvme_media_errors > 0)
+                 ) %}
+                <span class="pill sector-alert" title="{{ d.sector_summary or 'Sector issues' }}">Sectors!</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% if d.tag_list %}
+          <div class="tag-row drive-card-tags">
+            {% for t in d.tag_list %}
+              <span class="tag {% if t.upper().startswith('SMART:') %}tag-smart tag-smart-{{ d.smart_status or 'unknown' }}{% endif %}">{{ t }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+        <p class="path mono" title="{{ d.root_path }}">{{ d.root_path }}</p>
+        {% if d.is_remote and d.agent_url %}
+          <p class="path mono muted" title="{{ d.agent_url }}">via {{ d.agent_url }}</p>
+        {% endif %}
+        {% if d.smart_model or d.volume_label or d.smart_media or d.smart_bus %}
+          <p class="smart-line" title="{% if d.volume_label %}{{ d.volume_label }} · {% endif %}{{ d.smart_model or '' }}{% if d.smart_media %} · {{ d.smart_media }}{% endif %}{% if d.smart_bus %} · {{ d.smart_bus }}{% endif %}{% if d.smart_detail %} — {{ d.smart_detail[:180] }}{% endif %}">
+            {% if d.volume_label %}<strong>{{ d.volume_label }}</strong>{% endif %}
+            {% if d.smart_model %}{% if d.volume_label %} · {% endif %}{{ d.smart_model }}{% endif %}
+            {% if d.smart_media %} · {{ d.smart_media }}{% endif %}
+            {% if d.smart_bus %} · {{ d.smart_bus }}{% endif %}
+          </p>
+        {% endif %}
+        {% if d.capacity_total_bytes %}
+          {% set total = d.capacity_total_bytes %}
+          {% set free = d.capacity_free_bytes if d.capacity_free_bytes is not none else 0 %}
+          {% set used = d.capacity_used_bytes if d.capacity_used_bytes is not none else (total - free) %}
+          {% set pct_used = ((used / total) * 100) if total else 0 %}
+          {% set pct_free = ((free / total) * 100) if total else 0 %}
+          <div class="capacity-block">
+            <div class="capacity-text">
+              <span class="capacity-free">{{ free|filesize }} free</span>
+              <span class="capacity-sep">of</span>
+              <span class="capacity-total">{{ total|filesize }}</span>
+              <span class="capacity-pct muted">({{ '%.0f'|format(pct_free) }}% free)</span>
+            </div>
+            <div class="capacity-bar" title="{{ used|filesize }} used · {{ free|filesize }} free · {{ total|filesize }} total">
+              <span class="capacity-used {% if pct_used >= 95 %}crit{% elif pct_used >= 85 %}warn{% endif %}"
+                    style="width: {{ [100, pct_used]|min }}%"></span>
+            </div>
+          </div>
+        {% else %}
+          <div class="capacity-block capacity-unknown">
+            <span class="muted small">Size / free unknown — Scan or Check SMART</span>
+          </div>
+        {% endif %}
+        <dl class="stats">
+          <div><dt>Items</dt><dd>{{ d.item_count or 0 }}</dd></div>
+          <div>
+            <dt>Last scan</dt>
+            <dd title="{{ d.last_scanned_at or 'never' }}">
+              {% if d.last_scanned_at %}{{ d.last_scanned_at[:16]|replace('T', ' ') }}{% else %}never{% endif %}
+            </dd>
+          </div>
+          <div>
+            <dt>SMART</dt>
+            <dd title="{{ d.smart_checked_at or 'never' }}{% if d.smart_detail %} — {{ d.smart_detail[:160] }}{% endif %}">
+              {% if d.smart_checked_at %}{{ d.smart_checked_at[:16]|replace('T', ' ') }}{% else %}never{% endif %}
+            </dd>
+          </div>
+        </dl>
+        {% if d.notes %}<p class="notes">{{ d.notes }}</p>{% endif %}
+        <div class="actions">
+          <form method="post" action="{{ url_for('scan_drive', drive_id=d.id) }}" class="inline-form">
+            <input type="hidden" name="next" value="{{ url_for('index') }}">
+            <button type="submit" class="btn">Scan</button>
+          </form>
+          <form method="post" action="{{ url_for('refresh_smart', drive_id=d.id) }}" class="inline-form">
+            <input type="hidden" name="next" value="{{ url_for('index') }}">
+            <button type="submit" class="btn">SMART</button>
+          </form>
+          <a class="btn" href="{{ url_for('drive_detail', drive_id=d.id) }}">Browse</a>
+          <div class="export-menu">
+            <button type="button" class="btn export-menu-toggle" aria-haspopup="true" aria-expanded="false">
+              Export ▾
+            </button>
+            <div class="export-menu-panel" hidden role="menu">
+              <a role="menuitem" href="{{ url_for('export_pdf', drive_id=d.id) }}">PDF</a>
+              <a role="menuitem" href="{{ url_for('export_ods', drive_id=d.id) }}">ODS</a>
+            </div>
+          </div>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% if tags %}
+  <section class="section">
+    <h2>Tags in use</h2>
+    <div class="tag-row">
+      {% for t in tags %}
+        <a class="tag" href="{{ url_for('all_media', tag=t.name) }}">{{ t.name }}
+          <span class="count">{{ t.media_count }}</span></a>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+
+<script>
+(function () {
+  // Export PDF / ODS chooser menus
+  function closeAllExportMenus() {
+    document.querySelectorAll(".export-menu-panel").forEach(function (p) {
+      p.hidden = true;
+    });
+    document.querySelectorAll(".export-menu-toggle").forEach(function (t) {
+      t.setAttribute("aria-expanded", "false");
+    });
+    document.querySelectorAll(".export-menu").forEach(function (m) {
+      m.classList.remove("is-open");
+    });
+    document.querySelectorAll(".drive-card").forEach(function (c) {
+      c.classList.remove("menu-open");
+    });
+  }
+  document.querySelectorAll(".export-menu").forEach(function (menu) {
+    var toggle = menu.querySelector(".export-menu-toggle");
+    var panel = menu.querySelector(".export-menu-panel");
+    if (!toggle || !panel) return;
+    toggle.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var willOpen = panel.hidden;
+      closeAllExportMenus();
+      if (willOpen) {
+        panel.hidden = false;
+        toggle.setAttribute("aria-expanded", "true");
+        menu.classList.add("is-open");
+        var card = menu.closest(".drive-card");
+        if (card) card.classList.add("menu-open");
+      }
+    });
+    panel.addEventListener("click", function (e) {
+      e.stopPropagation();
+    });
+  });
+  document.addEventListener("click", closeAllExportMenus);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeAllExportMenus();
+  });
+
+  var scanAll = document.getElementById("scan-all-form");
+  var scanBtn = document.getElementById("scan-all-btn");
+  var prog = document.getElementById("scan-all-progress");
+  if (scanAll && scanBtn) {
+    scanAll.addEventListener("submit", function () {
+      scanBtn.disabled = true;
+      scanBtn.textContent = "Scanning all…";
+      if (prog) prog.hidden = false;
+    });
+  }
+})();
+</script>
+{% endblock %}

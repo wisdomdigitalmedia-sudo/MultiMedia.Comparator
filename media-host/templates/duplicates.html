@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Duplicates — Media Catalog{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="crumb"><a href="{{ url_for('index') }}">Drives</a> / Duplicates</p>
+    <h1>Best-copy duplicates</h1>
+    <p class="muted">
+      Powered by MultiMedia.Comparator · read-only · never deletes files
+    </p>
+  </div>
+  <div class="actions hero-actions">
+    <form method="post" action="{{ url_for('duplicates_compare') }}" class="inline-form">
+      <button type="submit" class="btn primary"
+              title="30–60 seconds on a large catalog">
+        {{ 'Re-compare catalog' if compared else 'Compare catalog' }}
+      </button>
+    </form>
+    <a class="btn" href="http://127.0.0.1:8767/" target="_blank" rel="noopener">Open Comparator app</a>
+  </div>
+</section>
+
+{% if not available %}
+  <div class="empty card">
+    <h2>Comparator project not found</h2>
+    <p>Keep <code>MultiMedia.Comparator</code> next to this folder on the Desktop.</p>
+  </div>
+{% elif not compared %}
+  <div class="empty card">
+    <h2>No compare run yet</h2>
+    <p>
+      Click <strong>Compare catalog</strong> to group the same movie / episode
+      across your drives and pick the highest-quality copy
+      (resolution, remux/Blu-ray/WEB, codec, HDR, audio).
+    </p>
+    <p class="muted small">Large libraries take about half a minute. Leave this tab open.</p>
+  </div>
+{% else %}
+  <p class="muted">
+    {{ item_count }} catalog items · {{ group_count }} groups · {{ extra_copies }} extra copies
+  </p>
+  <form class="filters card" method="get">
+    <label>Search
+      <input name="q" value="{{ q }}" placeholder="title or file">
+    </label>
+    <label>Kind
+      <select name="kind">
+        <option value="" {% if not kind %}selected{% endif %}>All</option>
+        <option value="movie" {% if kind == 'movie' %}selected{% endif %}>Movies</option>
+        <option value="episode" {% if kind == 'episode' %}selected{% endif %}>TV</option>
+        <option value="audio" {% if kind == 'audio' %}selected{% endif %}>Audio</option>
+      </select>
+    </label>
+    <label>Sort
+      <select name="sort">
+        <option value="gap" {% if sort == 'gap' %}selected{% endif %}>Quality gap</option>
+        <option value="copies" {% if sort == 'copies' %}selected{% endif %}>Copies</option>
+        <option value="name" {% if sort == 'name' %}selected{% endif %}>Title</option>
+      </select>
+    </label>
+    <button class="btn" type="submit">Filter</button>
+  </form>
+  <p class="muted small">Page {{ page }} / {{ pages }} · showing {{ groups|length }} of {{ total }}</p>
+  <div class="card table-wrap">
+    <table class="data">
+      <thead>
+        <tr><th>Title</th><th>Kind</th><th>Copies</th><th>Keep</th><th>Gap</th></tr>
+      </thead>
+      <tbody>
+        {% for g in groups %}
+          <tr>
+            <td>
+              <a href="{{ url_for('duplicates_group', key=g.key) }}">{{ g.label }}</a>
+              {% if g.mixed_editions %}<div class="muted small">{{ g.editions|join(', ') }}</div>{% endif %}
+            </td>
+            <td><span class="pill pill-{{ g.kind }}">{{ g.kind }}</span></td>
+            <td>{{ g.copies|length }}</td>
+            <td>
+              {% if g.winner %}
+                {{ g.winner.score.summary }}
+                <div class="muted small">{{ g.winner.score.total }} · {{ g.winner.item.drive_name }}</div>
+              {% endif %}
+            </td>
+            <td>{{ g.score_gap }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="actions">
+    {% if page > 1 %}
+      <a class="btn" href="{{ url_for('duplicates_page', q=q, kind=kind, sort=sort, page=page-1) }}">Prev</a>
+    {% endif %}
+    {% if page < pages %}
+      <a class="btn" href="{{ url_for('duplicates_page', q=q, kind=kind, sort=sort, page=page+1) }}">Next</a>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

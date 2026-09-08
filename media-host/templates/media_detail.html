@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ item.display_title }} — Media Catalog{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="crumb">
+      <a href="{{ url_for('drive_detail', drive_id=item.drive_id) }}">{{ item.drive_name }}</a>
+      / item
+    </p>
+    <h1>{{ item.display_title }}</h1>
+    <span class="pill pill-{{ item.kind }}">{% if item.kind == 'episode' %}TV Show{% elif item.kind == 'audio' %}MP3/FLAC{% else %}{{ item.kind }}{% endif %}</span>
+  </div>
+</section>
+
+<div class="card detail-grid">
+  <dl>
+    <div><dt>File</dt><dd class="mono">{{ item.file_name }}</dd></div>
+    <div><dt>Full path</dt><dd class="mono small">{{ item.file_path }}</dd></div>
+    <div><dt>Relative</dt><dd class="mono small">{{ item.relative_path }}</dd></div>
+    <div><dt>Extension</dt><dd class="mono">{{ item.extension }}</dd></div>
+    <div><dt>Size</dt><dd>{{ item.size_bytes|filesize }}</dd></div>
+    {% if item.show_name %}
+      <div><dt>Show</dt><dd>{{ item.show_name }}</dd></div>
+      <div><dt>Episode</dt><dd>S{{ '%02d'|format(item.season or 0) }}E{{ '%02d'|format(item.episode or 0) }}</dd></div>
+    {% endif %}
+    <div><dt>First seen</dt><dd>{{ item.first_seen_at }}</dd></div>
+    <div><dt>Last seen</dt><dd>{{ item.last_seen_at }}</dd></div>
+  </dl>
+</div>
+
+<form method="post" class="card form">
+  <h2>Tags for this item</h2>
+  <p class="hint">Comma-separated. Stored in the app database — files on disk are never renamed.</p>
+  <label>
+    Tags
+    <input type="text" name="tags" value="{{ tags_value }}"
+           placeholder="watched, favorite, watchlist">
+  </label>
+  {% if all_tags %}
+    <p class="hint">Existing tags:
+      {% for t in all_tags %}<span class="tag">{{ t.name }}</span> {% endfor %}
+    </p>
+  {% endif %}
+  <button type="submit" class="btn primary">Save tags</button>
+</form>
+{% endblock %}

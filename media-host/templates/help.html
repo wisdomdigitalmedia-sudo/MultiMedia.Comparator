@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Help — Media Catalog{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Setup &amp; usage</h1>
+</section>
+
+<div class="card prose">
+  <h2>Duplicates / best copy</h2>
+  <p>
+    The <strong>Duplicates</strong> tab (and the sibling
+    <a href="http://127.0.0.1:8767/">Media Comparator</a> on port 8767)
+    groups the same title across drives and marks the highest-quality copy.
+    It never deletes files. Deep scan of remote disks needs the 1.6 host installer
+    (it puts <code>ffprobe</code> on the file host for you).
+  </p>
+
+  <h2>What this app does</h2>
+  <ul>
+    <li>Scans <strong>mounted paths</strong> on this catalog PC</li>
+    <li>Or scans <strong>local Windows disks</strong> via a small agent (no SMB share needed)</li>
+    <li>Media types: <strong>Movie</strong>, <strong>TV Show</strong>, <strong>MP3/FLAC</strong> (audio)</li>
+    <li>Video: <code>.mkv .mp4 .m4v .avi .webm .mpg .mpeg</code></li>
+    <li>Audio: <code>.mp3 .flac .m4a .aac .ogg .opus .wav</code> (album folder used in title)</li>
+    <li>Skips junk folders (<code>sample</code>, <code>proof</code>, <code>subs</code>, …) and non-media files</li>
+    <li>Shows a clean title (folder name when it looks like a movie/show folder)</li>
+    <li>Tags per drive and per file (in a local SQLite DB — never renames files)</li>
+    <li>Exports a printable <strong>PDF list per drive</strong></li>
+  </ul>
+
+  <h2>Media host (Windows or Linux)</h2>
+  <p>
+    The catalog PC cannot see unshared disks. Run the <strong>1.6 installer</strong>
+    on the machine that holds the files (Windows, Linux, or Mac). Same dark
+    setup page as Media Comparator. Answer two questions, scan the LAN, then
+    install. It installs Python if needed, ffprobe, CrystalDiskInfo (Windows) or
+    smartctl (Linux), opens the firewall, and starts the agent.
+  </p>
+  <ol>
+    <li><a href="{{ url_for('download_agent_pack') }}">Download media-host-setup-1.6.zip</a></li>
+    <li>Unzip on the media server.</li>
+    <li>Windows: double-click <code>INSTALL.bat</code>. Linux/macOS: <code>chmod +x INSTALL.sh && ./INSTALL.sh</code>.</li>
+    <li>Pick catalog vs file server and Windows vs Linux. Click <strong>Scan this network</strong>, then <strong>Suggest install</strong>.</li>
+    <li>If this machine holds the disks, click <strong>Set up this host</strong>. Copy the address it shows.</li>
+    <li>On the catalog PC: Add drive → media host → paste the address → List drives.</li>
+  </ol>
+  <p>
+    Inventory is stored on the catalog PC. Playback still happens on the media host.
+    The installer opens the firewall for TCP 8766.
+  </p>
+
+  <h2>Mount Windows shares on Linux</h2>
+  <p>Windows must share the folders first (Properties → Sharing, or Advanced Sharing).</p>
+  <pre class="code"># install tools once
+sudo apt install cifs-utils
+
+# create a mount point
+sudo mkdir -p /mnt/win-movies
+
+# mount (replace IP, share name, username)
+sudo mount -t cifs //192.168.1.50/Movies /mnt/win-movies \
+  -o username=YOUR_WINDOWS_USER,uid=$(id -u),gid=$(id -g),iocharset=utf8
+
+# check it
+ls /mnt/win-movies</pre>
+  <p>Then in this app: <strong>Add drive</strong> → path <code>/mnt/win-movies</code> → <strong>Scan</strong>.</p>
+
+  <h2>Persist mounts across reboot (optional)</h2>
+  <pre class="code"># credentials file (mode 600)
+sudo nano /etc/samba/win-creds
+# username=...
+# password=...
+
+# /etc/fstab line example:
+# //192.168.1.50/Movies /mnt/win-movies cifs credentials=/etc/samba/win-creds,uid=1000,gid=1000,iocharset=utf8 0 0</pre>
+
+  <h2>If a share is not visible from the catalog PC</h2>
+  <ol>
+    <li>Prefer the <strong>media-host agent</strong> (above) — no sharing required.</li>
+    <li>Or on Windows: share the folder; Private network; File and Printer Sharing allowed.</li>
+    <li>From Linux: <code>smbclient -L //192.168.x.x -U user</code> to list shares, then mount and add as a local path.</li>
+  </ol>
+
+  <h2>Audio / music (MP3/FLAC)</h2>
+  <p>
+    Audio files are catalogued as type <strong>MP3/FLAC</strong>.
+    Titles prefer <em>Album — Track</em> when the file sits in an album folder
+    (Music/Artist/Album/01 Track.mp3). Re-scan drives after updating to pick up audio.
+  </p>
+
+  <h2>S.M.A.R.T. / disk health tags</h2>
+  <p>
+    Each catalogued drive can show a health badge and a drive tag:
+    <code>SMART:Healthy</code>, <code>SMART:Warning</code>,
+    <code>SMART:Failing</code>, or <code>SMART:Unknown</code>.
+  </p>
+  <ul>
+    <li><strong>Windows agent drives</strong> — health comes from Windows
+      <code>Get-PhysicalDisk</code> / <code>Get-Disk</code> / <code>Get-Volume</code>
+      (and <code>smartctl</code> if installed on Windows).
+      Agent <strong>version 1.1+</strong> required for SMART.</li>
+    <li><strong>Update the agent</strong> —
+      <a href="{{ url_for('download_agent_pack') }}">Download agent pack (zip)</a>
+      on the catalog PC, copy to the file host, overwrite the old folder, restart
+      <code>run_agent.bat</code>.</li>
+    <li><strong>Local Linux mounts</strong> — uses <code>smartctl</code>
+      (<code>sudo apt install smartmontools</code>). Network mounts have no local SMART.</li>
+    <li>Use <strong>Check SMART</strong> on a drive, or <strong>Check SMART all</strong> on the home page.</li>
+  </ul>
+  <p>
+    <strong>Unknown on some drives is normal:</strong> NAS mappings (e.g. Q:), some USB
+    enclosures, RAID virtual disks, and subst paths often cannot expose SMART to Windows.
+    Healthy/Warning/Failing on other letters still works when the OS can see the disk.
+  </p>
+  <h3>CrystalDiskInfo (recommended on Windows)</h3>
+  <p>
+    On the Windows file host we prefer
+    <a href="https://crystalmark.info/en/software/crystaldiskinfo/">CrystalDiskInfo</a>
+    (free) for SMART health. Install it, then restart the agent. The agent runs
+    <code>DiskInfo64.exe /CopyExit</code> and reads <code>DiskInfo.txt</code> — it does
+    <strong>not</strong> bundle CrystalDiskInfo; you install the official free app.
+  </p>
+  <pre class="code"># On Windows (optional but recommended)
+winget install -e --id CrystalDewWorld.CrystalDiskInfo
+# then restart run_agent.bat</pre>
+  <p>
+    Priority on Windows: <strong>CrystalDiskInfo</strong> → Windows Storage API →
+    <code>smartctl</code>. Linux local mounts still use <code>smartctl</code>.
+  </p>
+
+  <h3>Bad sectors</h3>
+  <p>
+    When CrystalDiskInfo or <code>smartctl</code> can read the drive, the app also pulls sector-related counters:
+  </p>
+  <ul>
+    <li><strong>Reallocated sectors</strong> — already remapped bad sectors (any &gt; 0 is a warning)</li>
+    <li><strong>Pending sectors</strong> — waiting to be remapped (any &gt; 0 is serious)</li>
+    <li><strong>Offline uncorrectable</strong> — unreadable sectors (any &gt; 0 is serious)</li>
+    <li><strong>UDMA CRC errors</strong> — often cable/USB dock noise, not always dying media</li>
+    <li><strong>NVMe media errors</strong> — integrity errors on NVMe</li>
+  </ul>
+  <p>
+    This is <em>not</em> a full surface scan; it reads SMART attributes the drive reports.
+    Install smartmontools on Windows for best results:
+    <code>winget install smartmontools</code> (then restart the agent).
+  </p>
+
+  <h2>Data location</h2>
+  <p>Catalog database: <code>data/catalog.db</code> next to the app. Safe to back up; deleting a drive in the UI only removes catalog rows, not media files.</p>
+</div>
+{% endblock %}

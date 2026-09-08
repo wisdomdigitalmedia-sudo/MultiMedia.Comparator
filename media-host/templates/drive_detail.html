@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% block title %}{{ drive.name }} — Media Catalog{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="crumb"><a href="{{ url_for('index') }}">Drives</a> / {{ drive.name }}</p>
+    <h1>{{ drive.name }}</h1>
+    {% if is_remote %}
+      <span class="pill pill-remote">Windows agent</span>
+    {% else %}
+      <span class="pill">local mount</span>
+    {% endif %}
+    {% if drive.hardware_type or drive.hardware_label %}
+      <span class="pill hw-pill hw-{{ drive.hardware_type or 'unknown' }}">{{ drive.hardware_label or (drive.hardware_type|hw_label) }}</span>
+    {% endif %}
+    {% if drive.smart_status %}
+      <span class="pill smart-{{ drive.smart_status }}">
+        SMART: {{ drive.smart_status|smart_label }}{% if drive.smart_temperature_c is not none %} · {{ drive.smart_temperature_c }}°C{% endif %}
+      </span>
+    {% endif %}
+    <p class="path mono">{{ drive.root_path }}</p>
+    {% if is_remote and drive.agent_url %}
+      <p class="path mono muted">Agent: {{ drive.agent_url }}</p>
+    {% endif %}
+    {% if drive_tags %}
+      <div class="tag-row">
+        {% for t in drive_tags %}
+          <span class="tag {% if t.upper().startswith('SMART:') %}tag-smart tag-smart-{{ drive.smart_status or 'unknown' }}{% endif %}">{{ t }}</span>
+        {% endfor %}
+      </div>
+    {% endif %}
+    <p class="muted">
+      {{ items|length }} shown ·
+      {{ drive.item_count or 0 }} total after last scan ·
+      scanned {{ drive.last_scanned_at or 'never' }}
+    </p>
+    {% if drive.capacity_total_bytes %}
+      {% set total = drive.capacity_total_bytes %}
+      {% set free = drive.capacity_free_bytes if drive.capacity_free_bytes is not none else 0 %}
+      {% set used = drive.capacity_used_bytes if drive.capacity_used_bytes is not none else (total - free) %}
+      {% set pct_used = ((used / total) * 100) if total else 0 %}
+      {% set pct_free = ((free / total) * 100) if total else 0 %}
+      <div class="capacity-block" style="max-width: 28rem; margin-top: 0.5rem">
+        <div class="capacity-text">
+          <span class="capacity-free">{{ free|filesize }} free</span>
+          <span class="capacity-sep">of</span>
+          <span class="capacity-total">{{ total|filesize }}</span>
+          <span class="capacity-pct muted">({{ '%.0f'|format(pct_free) }}% free)</span>
+        </div>
+        <div class="capacity-bar" title="{{ used|filesize }} used · {{ free|filesize }} free · {{ total|filesize }} total">
+          <span class="capacity-used {% if pct_used >= 95 %}crit{% elif pct_used >= 85 %}warn{% endif %}"
+                style="width: {{ [100, pct_used]|min }}%"></span>
+        </div>
+      </div>
+    {% endif %}
+    {% if drive.smart_checked_at %}
+      <div class="card smart-panel">
+        <h3 class="smart-panel-title">S.M.A.R.T. / disk health</h3>
+        <dl class="stats">
+          <div><dt>Status</dt><dd>{{ drive.smart_status|smart_label }}{% if drive.smart_status_raw %} ({{ drive.smart_status_raw }}){% endif %}</dd></div>
+          {% if drive.smart_temperature_c is not none %}
+            <div><dt>Temp</dt><dd>{{ drive.smart_temperature_c }}°C</dd></div>
+          {% endif %}
+          {% if drive.smart_model %}
+            <div><dt>Model</dt><dd>{{ drive.smart_model }}</dd></div>
+          {% endif %}
+          {% if drive.hardware_label or drive.hardware_type %}
+            <div><dt>Drive type</dt><dd>{{ drive.hardware_label or (drive.hardware_type|hw_label) }}</dd></div>
+          {% endif %}
+          {% if drive.smart_media %}
+            <div><dt>Media</dt><dd>{{ drive.smart_media }}</dd></div>
+          {% endif %}
+          {% if drive.smart_bus %}
+            <div><dt>Bus</dt><dd>{{ drive.smart_bus }}</dd></div>
+          {% endif %}
+          {% if drive.smart_serial %}
+            <div><dt>Serial</dt><dd class="mono small">{{ drive.smart_serial }}</dd></div>
+          {% endif %}
+          <div><dt>Checked</dt><dd>{{ drive.smart_checked_at }}</dd></div>
+          {% if drive.smart_source %}
+            <div><dt>Source</dt><dd class="small">{{ drive.smart_source }}</dd></div>
+          {% endif %}
+        </dl>
+
+        <h3 style="margin:1rem 0 0.4rem;font-size:0.95rem">Bad sectors / integrity</h3>
+        {% if drive.sector_attrs_available %}
+          <dl class="stats sector-stats" style="margin:0">
+            <div>
+              <dt>Reallocated</dt>
+              <dd class="{% if drive.sector_reallocated and drive.sector_reallocated > 0 %}sector-bad{% else %}sector-ok{% endif %}">
+                {{ drive.sector_reallocated if drive.sector_reallocated is not none else '—' }}
+              </dd>
+            </div>
+            <div>
+              <dt>Pending</dt>
+              <dd class="{% if drive.sector_pending and drive.sector_pending > 0 %}sector-bad{% else %}sector-ok{% endif %}">
+                {{ drive.sector_pending if drive.sector_pending is not none else '—' }}
+              </dd>
+            </div>
+            <div>
+              <dt>Uncorrectable</dt>
+              <dd class="{% if drive.sector_uncorrectable and drive.sector_uncorrectable > 0 %}sector-bad{% else %}sector-ok{% endif %}">
+                {{ drive.sector_uncorrectable if drive.sector_uncorrectable is not none else '—' }}
+              </dd>
+            </div>
+            <div>
+              <dt>CRC errors</dt>
+              <dd class="{% if drive.sector_crc and drive.sector_crc >= 50 %}sector-warn{% else %}sector-ok{% endif %}" title="Often cable/USB dock, not the platters">
+                {{ drive.sector_crc if drive.sector_crc is not none else '—' }}
+              </dd>
+            </div>
+            {% if drive.sector_reported_uncorrect is not none %}
+              <div>
+                <dt>Reported uncorr.</dt>
+                <dd class="{% if drive.sector_reported_uncorrect > 0 %}sector-warn{% else %}sector-ok{% endif %}">
+                  {{ drive.sector_reported_uncorrect }}
+                </dd>
+              </div>
+            {% endif %}
+            {% if drive.nvme_media_errors is not none %}
+              <div>
+                <dt>NVMe media err</dt>
+                <dd class="{% if drive.nvme_media_errors > 0 %}sector-bad{% else %}sector-ok{% endif %}">
+                  {{ drive.nvme_media_errors }}
+                </dd>
+              </div>
+            {% endif %}
+          </dl>
+          {% if drive.sector_summary %}
+            <p class="muted small" style="margin:0.5rem 0 0">{{ drive.sector_summary }}</p>
+          {% endif %}
+          <p class="hint" style="margin:0.4rem 0 0">
+            Pending or uncorrectable &gt; 0 is serious. Reallocated &gt; 0 means the drive remapped bad sectors — watch for growth.
+            CRC spikes often mean a bad cable or USB enclosure, not dying media.
+          </p>
+        {% else %}
+          <p class="muted small" style="margin:0">
+            Sector attributes not available for this volume.
+            Typical for some USB docks, RAID, and network/NAS mappings.
+            Install <code>smartctl</code> on the machine that has the disk (Windows: smartmontools) and re-run Check SMART.
+          </p>
+        {% endif %}
+
+        {% if drive.smart_detail %}
+          <p class="muted small smart-detail">{{ drive.smart_detail[:400] }}</p>
+        {% endif %}
+      </div>
+    {% endif %}
+    {% if is_remote %}
+      <p class="hint">
+        Scan talks to the Windows agent over the network. The agent must be running
+        on the media host (see Help). SMART prefers <strong>CrystalDiskInfo</strong>
+        when installed, then Windows disk health, then smartctl.
+      </p>
+    {% endif %}
+  </div>
+  <div class="actions stack">
+    <form method="post" action="{{ url_for('scan_drive', drive_id=drive.id) }}"
+          id="scan-form" class="scan-form">
+      <button type="submit" class="btn primary" id="scan-btn">Scan now</button>
+    </form>
+    <form method="post" action="{{ url_for('refresh_smart', drive_id=drive.id) }}"
+          id="smart-form" class="scan-form">
+      <button type="submit" class="btn" id="smart-btn">Check SMART</button>
+    </form>
+    <a class="btn" href="{{ url_for('export_pdf', drive_id=drive.id) }}">Export PDF</a>
+    <a class="btn" href="{{ url_for('export_ods', drive_id=drive.id, q=q, kind=kind, tag=tag) }}">Export ODS</a>
+    <a class="btn" href="{{ url_for('edit_drive', drive_id=drive.id) }}">Edit</a>
+  </div>
+  <p id="scan-progress" class="muted small" hidden style="margin:0.5rem 0 0">
+    Working… large drives can take several minutes. Leave this tab open.
+  </p>
+</section>
+
+<form class="filters card" method="get">
+  <label>Search
+    <input type="search" name="q" value="{{ q }}" placeholder="title or path">
+  </label>
+  <label>Type
+    <select name="kind">
+      <option value="">All</option>
+      <option value="movie" {% if kind == 'movie' %}selected{% endif %}>Movie</option>
+      <option value="episode" {% if kind == 'episode' %}selected{% endif %}>TV Show</option>
+      <option value="audio" {% if kind == 'audio' %}selected{% endif %}>MP3/FLAC</option>
+      <option value="other" {% if kind == 'other' %}selected{% endif %}>Other</option>
+    </select>
+  </label>
+  <label>Tag
+    <select name="tag">
+      <option value="">Any</option>
+      {% for t in all_tags %}
+        <option value="{{ t.name }}" {% if tag == t.name %}selected{% endif %}>{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit" class="btn">Filter</button>
+  {% if q or kind or tag %}
+    <a class="btn" href="{{ url_for('drive_detail', drive_id=drive.id) }}">Clear</a>
+  {% endif %}
+</form>
+
+{% if not items %}
+  <div class="empty card">
+    <p>No media listed yet. Click <strong>Scan now</strong> (path must be mounted and readable).</p>
+  </div>
+{% else %}
+  <div class="table-wrap card">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Type</th>
+          <th>Ext</th>
+          <th>Size</th>
+          <th>Tags</th>
+          <th>Relative path</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+          <tr>
+            <td>
+              <a href="{{ url_for('media_detail', media_id=item.id) }}">{{ item.display_title }}</a>
+            </td>
+            <td><span class="pill pill-{{ item.kind }}">{% if item.kind == 'episode' %}TV Show{% elif item.kind == 'audio' %}MP3/FLAC{% else %}{{ item.kind }}{% endif %}</span></td>
+            <td class="mono">{{ item.extension }}</td>
+            <td>{{ item.size_bytes|filesize }}</td>
+            <td class="tags-cell">{{ item.tags or '—' }}</td>
+            <td class="mono small">{{ item.relative_path }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+
+<form method="post" action="{{ url_for('delete_drive', drive_id=drive.id) }}"
+      class="danger-zone"
+      onsubmit="return confirm('Delete this drive and all its catalog entries? Files on disk are not touched.');">
+  <button type="submit" class="btn danger">Remove drive from catalog</button>
+</form>
+
+<script>
+(function () {
+  function armBusy(form, btn, msg) {
+    if (!form || !btn) return;
+    form.addEventListener("submit", function () {
+      btn.disabled = true;
+      btn.textContent = msg;
+      var prog = document.getElementById("scan-progress");
+      if (prog) {
+        prog.hidden = false;
+        prog.textContent = msg + " Large libraries can take several minutes — leave this tab open.";
+      }
+    });
+  }
+  armBusy(
+    document.getElementById("scan-form"),
+    document.getElementById("scan-btn"),
+    "Scanning media…"
+  );
+  armBusy(
+    document.getElementById("smart-form"),
+    document.getElementById("smart-btn"),
+    "Checking SMART…"
+  );
+})();
+</script>
+{% endblock %}

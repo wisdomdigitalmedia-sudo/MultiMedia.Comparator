@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ group.label }} — Duplicates{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="crumb">
+      <a href="{{ url_for('index') }}">Drives</a> /
+      <a href="{{ url_for('duplicates_page') }}">Duplicates</a>
+    </p>
+    <h1>{{ group.label }}</h1>
+    <p class="muted">
+      <span class="pill pill-{{ group.kind }}">{{ group.kind }}</span>
+      {{ group.copies|length }} copies · gap {{ group.score_gap }}
+    </p>
+  </div>
+</section>
+
+{% for c in group.copies %}
+  <article class="card">
+    <p>
+      {% if c.is_winner %}
+        <span class="pill smart-healthy">KEEP</span>
+      {% else %}
+        <span class="pill smart-warning">lower quality</span>
+      {% endif %}
+      <strong>{{ '%.1f'|format(c.score.total) }}</strong>
+      · {{ c.score.summary }}
+    </p>
+    <p class="mono">{{ c.item.file_name }}</p>
+    <p class="path">{{ c.item.drive_name }} · {{ c.item.file_path }}</p>
+    <p class="muted small">{{ c.item.size_bytes|filesize }} · {{ c.score.reasons|join(' · ') }}</p>
+  </article>
+{% endfor %}
+{% endblock %}

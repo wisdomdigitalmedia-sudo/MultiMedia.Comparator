@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Media Catalog{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_v }}">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <a href="{{ url_for('index') }}">Media Catalog</a>
+      <span class="sub">personal · local only</span>
+    </div>
+    <nav>
+      <a href="{{ url_for('index') }}">Drives</a>
+      <a href="{{ url_for('all_media') }}">All media</a>
+      <a href="{{ url_for('duplicates_page') }}">Duplicates</a>
+      <a href="{{ url_for('add_drive') }}">Add drive</a>
+      <a href="{{ url_for('help_page') }}">Help</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flashes">
+          {% for cat, msg in messages %}
+            <li class="flash flash-{{ cat }}">{{ msg }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="foot">
+    Video-only scanner · ignores samples, proofs, archives, images, NFO junk
+  </footer>
+</body>
+</html>

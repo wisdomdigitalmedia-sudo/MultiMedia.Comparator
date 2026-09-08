@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == 'edit' %}Edit drive{% else %}Add drive{% endif %} — Media Catalog{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>{% if mode == 'edit' %}Edit drive{% else %}Add drive{% endif %}</h1>
+  <p class="muted">
+    Local mount paths on this PC, or disks that are <strong>not shared</strong>
+    via the agent on your media host.
+  </p>
+</section>
+
+{% if mode == 'add' %}
+  <div class="source-tabs card">
+    <a class="tab {% if source != 'remote' %}active{% endif %}"
+       href="{{ url_for('add_drive', source='local') }}">Mounted path (this PC)</a>
+    <a class="tab {% if source == 'remote' %}active{% endif %}"
+       href="{{ url_for('add_drive', source='remote') }}">Media host (agent)</a>
+  </div>
+{% else %}
+  <p class="card muted">
+    Source:
+    {% if source == 'remote' %}
+      <span class="pill pill-remote">Windows agent</span>
+    {% else %}
+      <span class="pill">Local mount</span>
+    {% endif %}
+    (cannot change type after create — remove and re-add if needed)
+  </p>
+{% endif %}
+
+{% set f = form if form is defined and form else {} %}
+
+{% if source == 'remote' %}
+  <div class="card callout">
+    <h2>Media-host agent required</h2>
+    <p>
+      Unshared disks on another PC are invisible here. Run a small agent on the
+      file host so this app can list volumes and scan them over the LAN.
+    </p>
+    <pre class="code"># On the file-host PC (copy this project folder there)
+py -3 agent.py
+# listens on all interfaces, port 8766
+# optional: py -3 agent.py --token mysecret
+
+# Allow inbound TCP 8766 in the host firewall if prompted</pre>
+    <p class="hint" style="margin-bottom:0">
+      Full steps on the <a href="{{ url_for('help_page') }}">Help</a> page.
+    </p>
+  </div>
+{% endif %}
+
+<form method="post" class="card form" id="drive-form">
+  <input type="hidden" name="source" value="{{ source }}">
+
+  {% if source == 'remote' %}
+    <fieldset class="remote-box">
+      <legend>Connect to the media host</legend>
+      {% if f.get('agent_host') or f.get('agent_url') %}
+        <p class="hint" style="margin-top:0">
+          Pre-filled from last used agent
+          {% if f.get('agent_host') %}
+            (<code class="mono">{{ f.get('agent_host') }}:{{ f.get('agent_port', '8766') }}</code>).
+          {% endif %}
+          Change only if the media-host IP changed.
+        </p>
+      {% endif %}
+      <div class="row-2">
+        <label>
+          Host / IP
+          <input type="text" name="agent_host" class="mono"
+                 value="{{ f.get('agent_host', '') }}"
+                 placeholder="192.168.1.50" autocomplete="on">
+        </label>
+        <label>
+          Port
+          <input type="text" name="agent_port" class="mono"
+                 value="{{ f.get('agent_port', '8766') or '8766' }}"
+                 placeholder="8766">
+        </label>
+      </div>
+      <label>
+        Or full agent URL
+        <input type="text" name="agent_url" class="mono"
+               value="{{ f.get('agent_url', '') }}"
+               placeholder="http://192.168.1.50:8766">
+      </label>
+      <label>
+        Token (optional)
+        <input type="password" name="agent_token" class="mono"
+               value="{{ f.get('agent_token', '') }}"
+               placeholder="only if agent started with --token"
+               autocomplete="off">
+      </label>
+      <div class="actions">
+        <button type="submit" name="action" value="list_remote" class="btn primary">
+          List Windows drives
+        </button>
+      </div>
+    </fieldset>
+
+    {% if remote_drives is defined and remote_drives %}
+      <div class="remote-results">
+        <h3>
+          Drives on
+          {% if agent_info %}{{ agent_info.get('hostname', 'PC') }}{% else %}PC{% endif %}
+        </h3>
+        <p class="hint">Click a drive to fill the path field below (or type a subfolder path).</p>
+        <div class="drive-pick-grid">
+          {% for rd in remote_drives %}
+            {# data-letter only — never put backslashes in HTML attributes #}
+            <button type="button"
+                    class="drive-pick {% if rd.already_added %}already-added{% endif %}"
+                    data-letter="{{ rd.letter[0] if rd.letter else '' }}"
+                    data-label="{{ rd.display|e }}"
+                    {% if rd.already_added %}title="Already in catalog"{% endif %}>
+              <strong>{{ rd.display }}</strong>
+              <span class="mono small">{{ rd.letter[0] if rd.letter else '?' }}:/</span>
+              {% if rd.already_added %}
+                <span class="pill already-pill">In catalog</span>
+              {% endif %}
+              {% if rd.free_bytes is not none and rd.total_bytes %}
+                <span class="muted small">
+                  {{ (rd.free_bytes / 1073741824)|round(1) }} GB free
+                  / {{ (rd.total_bytes / 1073741824)|round(1) }} GB
+                </span>
+              {% endif %}
+            </button>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  {% endif %}
+
+  <label>
+    Display name
+    <input type="text" name="name" required
+           value="{{ f.get('name', drive.name if drive else '') }}"
+           placeholder="{% if source == 'remote' %}e.g. Media Center D:{% else %}e.g. Windows Movies{% endif %}">
+  </label>
+
+  {% if mode == 'add' and existing_drives is defined and existing_drives %}
+    <div class="catalog-map" id="catalog-map">
+      <div class="catalog-map-head">
+        <h3>Already in catalog</h3>
+        <span class="muted small">{{ existing_drives|length }} drive{{ 's' if existing_drives|length != 1 else '' }}</span>
+      </div>
+      <p class="hint" style="margin-top:0">
+        These are already added — open one, or click a letter to re-use its path.
+      </p>
+      <div class="catalog-map-grid">
+        {% for ed in existing_drives %}
+          <div class="catalog-drive {% if ed.is_remote %}is-remote{% else %}is-local{% endif %} {% if ed.same_agent %}same-agent{% endif %} hw-{{ ed.hardware_type or 'unknown' }} {% if ed.smart_status %}smart-{{ ed.smart_status }}{% endif %}"
+               data-path="{{ ed.root_path|e }}"
+               data-name="{{ ed.name|e }}"
+               title="{{ ed.hardware_label or 'Unknown type' }} · {{ ed.root_path }}">
+            <div class="catalog-drive-face catalog-drive-face-graphic">
+              {% set d = ed %}
+              {% include "_drive_type_graphic.html" %}
+              <div class="catalog-drive-body">
+                <div class="catalog-drive-name">{{ ed.name }}</div>
+                <div class="catalog-drive-path mono">{{ ed.root_path }}</div>
+                <div class="catalog-drive-meta">
+                  <span class="pill hw-pill hw-{{ ed.hardware_type or 'unknown' }}">{{ ed.hardware_label or 'Unknown' }}</span>
+                  <span>{{ ed.item_count or 0 }} items</span>
+                  {% if ed.is_remote %}
+                    <span class="pill pill-remote">agent</span>
+                  {% else %}
+                    <span class="pill">local</span>
+                  {% endif %}
+                  {% if ed.smart_status %}
+                    <span class="pill smart-{{ ed.smart_status }}">{{ ed.smart_status|smart_label }}</span>
+                  {% endif %}
+                </div>
+                {% if ed.item_count and ed.item_count > 0 %}
+                  <div class="catalog-bar" aria-hidden="true">
+                    <span style="width: {% if ed.item_count > 5000 %}100{% elif ed.item_count > 1000 %}70{% elif ed.item_count > 200 %}45{% else %}20{% endif %}%"></span>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="catalog-drive-actions">
+              <a class="btn" href="{{ url_for('drive_detail', drive_id=ed.id) }}">Open</a>
+              {% if mode == 'add' %}
+                <button type="button" class="btn catalog-use-path">Use path</button>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% elif mode == 'add' %}
+    <div class="catalog-map catalog-map-empty">
+      <p class="muted" style="margin:0">No drives in the catalog yet — add your first path below.</p>
+    </div>
+  {% endif %}
+
+  <label>
+    {% if source == 'remote' %}
+      Windows path to scan
+    {% else %}
+      Mount path on this PC
+    {% endif %}
+    <input type="text" name="root_path" id="root_path" required class="mono"
+           value="{{ f.get('root_path', drive.root_path if drive else '') }}"
+           placeholder="{% if source == 'remote' %}D:/ or D:/Movies{% else %}/mnt/windows-movies{% endif %}">
+  </label>
+
+  {% if source == 'local' %}
+    <p class="hint">
+      Path must exist and be readable. Mount SMB shares first
+      (<code>//WINDOWS-PC/Share</code> → <code>/mnt/...</code>).
+    </p>
+  {% else %}
+    <p class="hint">
+      Path is on the file host (not a local mount).
+      Prefer forward slashes: <code>D:/</code>, <code>E:/Movies</code>, <code>/mnt/media</code>.
+      Full-drive scans on multi-TB disks can take many minutes — leave the agent window open.
+    </p>
+  {% endif %}
+
+  <label>
+    Notes (optional)
+    <textarea name="notes" rows="2" placeholder="Which machine, credentials hint, etc.">{{ f.get('notes', drive.notes if drive else '') }}</textarea>
+  </label>
+  <label>
+    Drive tags (comma-separated)
+    <input type="text" name="tags"
+           value="{{ tags_value if tags_value is defined else '' }}"
+           placeholder="e.g. 4K, kids, backup">
+  </label>
+  <div class="actions">
+    <button type="submit" name="action" value="save" class="btn primary">
+      {% if mode == 'edit' %}Save{% else %}Add drive{% endif %}
+    </button>
+    <a class="btn" href="{{ url_for('index') }}">Cancel</a>
+  </div>
+</form>
+
+<script>
+  document.querySelectorAll(".drive-pick").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      // Build E:/ from a single letter — never rely on backslash paths in HTML
+      var letter = (btn.getAttribute("data-letter") || "").trim().charAt(0);
+      var path = letter ? (letter.toUpperCase() + ":/") : "";
+      var label = btn.getAttribute("data-label") || path;
+      var pathInput = document.getElementById("root_path");
+      var nameInput = document.querySelector('input[name="name"]');
+      if (pathInput) pathInput.value = path;
+      if (nameInput && !nameInput.value.trim()) {
+        nameInput.value = label;
+      }
+      document.querySelectorAll(".drive-pick").forEach(function (b) {
+        b.classList.remove("selected");
+      });
+      btn.classList.add("selected");
+    });
+  });
+
+  document.querySelectorAll(".catalog-use-path").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var card = btn.closest(".catalog-drive");
+      if (!card) return;
+      var path = card.getAttribute("data-path") || "";
+      var name = card.getAttribute("data-name") || "";
+      var pathInput = document.getElementById("root_path");
+      var nameInput = document.querySelector('input[name="name"]');
+      if (pathInput) pathInput.value = path;
+      if (nameInput && !nameInput.value.trim()) nameInput.value = name;
+      document.querySelectorAll(".catalog-drive").forEach(function (c) {
+        c.classList.remove("selected");
+      });
+      card.classList.add("selected");
+      if (pathInput) pathInput.focus();
+    });
+  });
+</script>
+{% endblock %}

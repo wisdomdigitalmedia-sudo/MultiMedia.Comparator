@@ -44,7 +44,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Find duplicate media and pick the best copy")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p_imp = sub.add_parser("import-catalog", help="Import Entertainment.Servers catalog.db")
+    p_imp = sub.add_parser("import-catalog", help="Import catalog.db into the comparator store")
     p_imp.add_argument("--catalog", default=None)
 
     p_fold = sub.add_parser("scan", help="Scan a local folder")
@@ -56,7 +56,7 @@ def main() -> int:
     p_cmp.add_argument("--limit", type=int, default=25)
     p_cmp.add_argument("--json", action="store_true")
 
-    p_live = sub.add_parser("catalog", help="Compare Entertainment.Servers catalog directly")
+    p_live = sub.add_parser("catalog", help="Compare catalog.db directly")
     p_live.add_argument("--catalog", default=None)
     p_live.add_argument("--kind", default=None)
     p_live.add_argument("--limit", type=int, default=25)

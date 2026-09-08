@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Media Host setup</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="shell-top">
+    <a class="brand" href="/">
+      <span class="brand-mark">MC</span>
+      <span class="brand-copy">
+        <strong>Media Host</strong>
+        <span>setup 1.6 · any OS pair</span>
+      </span>
+    </a>
+    <span class="pill" id="os-pill">Detecting…</span>
+  </header>
+
+  <main class="wrap page-enter">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Setup wizard</p>
+        <h1>What kind of setup is this?</h1>
+        <p class="muted">Linux, Windows, or Mac — catalog PC or file server. We scan the LAN and tell you what to install where.</p>
+      </div>
+      <div class="actions">
+        <button class="btn" id="btn-scan" type="button">Scan this network</button>
+        <button class="btn" id="btn-refresh" type="button">Recheck tools</button>
+      </div>
+    </section>
+
+    <article class="card" id="ask-card">
+      <p class="eyebrow">This computer</p>
+      <p class="muted small" id="machine-line">Detecting…</p>
+
+      <h2 style="margin:1rem 0 0.35rem;font-size:1.05rem">1. This machine is</h2>
+      <div class="choice-grid" id="role-choices">
+        <button type="button" class="choice on" data-role="catalog"><strong>The catalog PC</strong> I browse the library here (Comparator).</button>
+        <button type="button" class="choice" data-role="files"><strong>The media file server</strong> The disks live here (USB docks / NAS / library).</button>
+        <button type="button" class="choice" data-role="both"><strong>Both</strong> Files and the app are on this same computer.</button>
+      </div>
+
+      <h2 style="margin:0.4rem 0 0.35rem;font-size:1.05rem">2. The media files are on</h2>
+      <div class="choice-grid" id="files-choices">
+        <button type="button" class="choice" data-files="this"><strong>This computer</strong> Local disks or folders I can already open.</button>
+        <button type="button" class="choice on" data-files="windows"><strong>A Windows PC</strong> Unshared letters like D:/ E:/ — needs the Windows agent.</button>
+        <button type="button" class="choice" data-files="linux"><strong>A Linux PC / NAS</strong> Needs the same agent on that Linux box.</button>
+        <button type="button" class="choice" data-files="mixed"><strong>Mixed</strong> Some folders here, some on another PC.</button>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="btn-plan" type="button">Suggest install</button>
+      </div>
+    </article>
+
+    <article class="card" id="scan-card">
+      <p class="eyebrow">LAN</p>
+      <h2 style="margin:0.2rem 0 0.4rem;font-size:1.05rem">What we can see on this network</h2>
+      <p class="muted small" id="scan-status">Checking nearby devices, then you can scan the whole subnet for an agent (8766) or Comparator (8767).</p>
+      <div id="peer-list"></div>
+    </article>
+
+    <article class="card" id="plan-card" hidden>
+      <p class="eyebrow">Recommended</p>
+      <h2 style="margin:0.2rem 0 0.4rem;font-size:1.05rem" id="plan-title">—</h2>
+      <p class="muted" id="plan-summary"></p>
+      <h3 style="font-size:0.95rem;margin:0.8rem 0 0.2rem">On this computer</h3>
+      <ol class="plan-ol" id="plan-here"></ol>
+      <div id="plan-other-wrap">
+        <h3 style="font-size:0.95rem;margin:0.8rem 0 0.2rem">On the other computer</h3>
+        <ol class="plan-ol" id="plan-other"></ol>
+      </div>
+      <h3 style="font-size:0.95rem;margin:0.8rem 0 0.2rem">Then</h3>
+      <ol class="plan-ol" id="plan-then"></ol>
+      <p class="muted small" id="plan-agent" hidden></p>
+    </article>
+
+    <div id="skel">
+      <div class="kpi-grid">
+        <div class="card skel skel-card"></div>
+        <div class="card skel skel-card"></div>
+        <div class="card skel skel-card"></div>
+      </div>
+    </div>
+
+    <div id="live" hidden>
+      <div class="kpi-grid">
+        <article class="card kpi"><dt>This computer</dt><dd id="kpi-host">—</dd><p class="muted small" id="kpi-os"></p></article>
+        <article class="card kpi"><dt>Catalog address</dt><dd id="kpi-url">—</dd><p class="muted small">Paste this on the Linux catalog PC</p></article>
+        <article class="card kpi"><dt>Ready</dt><dd id="kpi-ready">—</dd><p class="muted small" id="kpi-py"></p></article>
+      </div>
+
+      <article class="card">
+        <p class="eyebrow">Checklist</p>
+        <h2 style="margin:0.2rem 0 0.4rem;font-size:1.05rem">Tools this host needs</h2>
+        <p class="muted small">Run this on the machine that holds the disks (or when the plan says to).</p>
+        <div class="actions" style="margin:0.4rem 0 0.6rem">
+          <button class="btn primary" id="btn-all" type="button">Set up this host</button>
+        </div>
+        <div id="steps"></div>
+      </article>
+
+      <article class="card" id="done-card" hidden>
+        <p class="eyebrow">Connected</p>
+        <h2 style="margin:0.2rem 0 0.5rem;font-size:1.05rem">On your catalog PC</h2>
+        <p class="muted">Add drive → Windows PC / media host → paste this address → List drives.</p>
+        <div class="copy-box">
+          <code id="copy-url"></code>
+          <button class="btn" id="btn-copy" type="button">Copy</button>
+        </div>
+      </article>
+
+      <article class="card">
+        <p class="eyebrow">Activity</p>
+        <div class="progress-strip" id="busy-bar" hidden><i></i></div>
+        <pre class="log" id="log">Waiting to start…</pre>
+      </article>
+    </div>
+  </main>
+
+  <script>
+  const $ = (id) => document.getElementById(id);
+  const logEl = $("log");
+  function log(line) {
+    const t = new Date().toLocaleTimeString();
+    logEl.textContent = (logEl.textContent === "Waiting to start…" ? "" : logEl.textContent)
+      + `[${t}] ${line}\n`;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function tone(ok) {
+    if (ok === true) return "ok";
+    if (ok === false) return "bad";
+    return "warn";
+  }
+
+  function render(st) {
+    $("skel").hidden = true;
+    $("live").hidden = false;
+    $("os-pill").textContent = (st.os_label || st.os || "this PC") + " host";
+    $("os-pill").className = "pill ok";
+    $("kpi-host").textContent = st.hostname || "this PC";
+    $("kpi-os").textContent = `${st.os_label} · ${st.arch}`;
+    $("kpi-url").textContent = st.agent.url;
+    $("kpi-ready").textContent = st.ready ? "Yes" : "Not yet";
+    $("kpi-py").textContent = `Python ${st.python.version}`;
+    $("copy-url").textContent = st.agent.url;
+    $("done-card").hidden = !st.agent.running;
+
+    const items = [st.python, st.ffprobe, st.smart, st.firewall, st.agent];
+    $("steps").innerHTML = items.map((s) => {
+      const cls = s.ok === true ? "ok" : s.ok === false ? "bad" : "";
+      const mark = s.ok === true ? "✓" : s.ok === false ? "!" : "·";
+      let action = "";
+      if (s.id && s.id !== "python") {
+        const label = s.id === "firewall" ? "Open firewall" : s.id === "agent" ? "Start agent" : "Install";
+        action = `<button class="btn" data-step="${s.id}" type="button">${label}</button>`;
+      }
+      return `<div class="step ${cls}" data-row="${s.id || ""}">
+        <div class="step-dot">${mark}</div>
+        <div>
+          <h3>${s.label || "Python"}</h3>
+          <p class="muted small">${s.detail || s.path || ""}</p>
+        </div>
+        ${action}
+      </div>`;
+    }).join("");
+
+    $("steps").querySelectorAll("[data-step]").forEach((btn) => {
+      btn.addEventListener("click", () => runOne(btn.getAttribute("data-step")));
+    });
+  }
+
+  async function refresh() {
+    const res = await fetch("/api/status");
+    const st = await res.json();
+    render(st);
+    return st;
+  }
+
+  async function runOne(step) {
+    $("busy-bar").hidden = false;
+    if (step === "firewall") {
+      log("Opening firewall — watch for a Windows “allow this app” prompt. It may appear behind this browser. Click Yes.");
+    } else {
+      log(`Installing ${step}…`);
+    }
+    const res = await fetch("/api/setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ step }),
+    });
+    const data = await res.json();
+    log(data.detail || (data.ok ? `${step} ready` : `${step} failed`));
+    if (data.status) render(data.status);
+    else await refresh();
+    $("busy-bar").hidden = true;
+  }
+
+  async function runAll() {
+    $("btn-all").disabled = true;
+    $("busy-bar").hidden = false;
+    log("Starting full setup for this host…");
+    const steps = ["ffprobe", "smart", "firewall", "agent"];
+    for (const step of steps) {
+      await runOne(step);
+    }
+    log("Setup finished. If firewall is still unmarked, click Open firewall and Yes on the Windows prompt.");
+    $("btn-all").disabled = false;
+  }
+
+  $("btn-all").addEventListener("click", runAll);
+  $("btn-refresh").addEventListener("click", () => refresh());
+
+  let peers = [];
+  let role = "catalog";
+  let filesWhere = "windows";
+
+  function pick(group, attr, value) {
+    group.querySelectorAll(".choice").forEach((b) => {
+      b.classList.toggle("on", b.getAttribute(attr) === value);
+    });
+  }
+  $("role-choices").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-role]");
+    if (!b) return;
+    role = b.getAttribute("data-role");
+    pick($("role-choices"), "data-role", role);
+  });
+  $("files-choices").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-files]");
+    if (!b) return;
+    filesWhere = b.getAttribute("data-files");
+    pick($("files-choices"), "data-files", filesWhere);
+  });
+
+  function renderPeers(list) {
+    if (!list.length) {
+      $("peer-list").innerHTML = "<p class='muted small'>No Comparator or media-host agent answered on this subnet yet.</p>";
+      return;
+    }
+    $("peer-list").innerHTML = list.map((p) => {
+      const name = p.hostname ? `${p.hostname} · ${p.ip}` : p.ip;
+      return `<div class="peer"><span><strong>${name}</strong><br><span class="muted small">${p.detail || ""}</span></span><code class="mono">${p.agent ? p.agent_url : p.catalog_url}</code></div>`;
+    }).join("");
+  }
+
+  function renderPlan(plan) {
+    $("plan-card").hidden = false;
+    $("plan-title").textContent = plan.title || "Plan";
+    $("plan-summary").textContent = plan.summary || "";
+    const ol = (id, items) => {
+      $(id).innerHTML = (items || []).map((s) => `<li>${s}</li>`).join("") || "<li class='muted'>Nothing extra.</li>";
+    };
+    ol("plan-here", plan.this_machine);
+    ol("plan-other", plan.other_machine);
+    ol("plan-then", plan.then);
+    $("plan-other-wrap").hidden = !(plan.other_machine && plan.other_machine.length);
+    const ag = $("plan-agent");
+    if (plan.suggested_agent) {
+      ag.hidden = false;
+      ag.textContent = "Suggested agent address: " + plan.suggested_agent;
+    } else ag.hidden = true;
+  }
+
+  async function runScan(quick) {
+    $("btn-scan").disabled = true;
+    $("scan-status").textContent = quick
+      ? "Checking devices this PC already talks to…"
+      : "Scanning this subnet for ports 8766 (agent) and 8767 (Comparator)…";
+    try {
+      const res = await fetch(quick ? "/api/lan-scan?quick=1" : "/api/lan-scan");
+      const data = await res.json();
+      peers = data.peers || [];
+      $("scan-status").textContent = peers.length
+        ? `Found ${peers.length} media service${peers.length === 1 ? "" : "s"}${quick ? " nearby. Click Scan this network for the whole subnet." : "."}`
+        : (quick
+          ? "No agent or Comparator on nearby devices yet. Click Scan this network to probe the whole subnet."
+          : "Scan finished — nothing on 8766/8767 yet (start the other PC’s installer, then scan again).");
+      renderPeers(peers);
+    } catch (err) {
+      $("scan-status").textContent = "Scan failed: " + err;
+    }
+    $("btn-scan").disabled = false;
+  }
+  $("btn-scan").addEventListener("click", () => runScan(false));
+
+  $("btn-plan").addEventListener("click", async () => {
+    const res = await fetch("/api/plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role, files_where: filesWhere, peers }),
+    });
+    const plan = await res.json();
+    renderPlan(plan);
+    log("Plan: " + (plan.title || "custom"));
+    $("plan-card").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  fetch("/api/machine").then((r) => r.json()).then((m) => {
+    $("machine-line").textContent = `${m.os_label} · ${m.hostname || "this PC"} · LAN ${m.lan_ip}${m.subnet ? " (" + m.subnet + ")" : ""} · Python ${m.python}`;
+    if (m.suggested_role) {
+      role = m.suggested_role;
+      pick($("role-choices"), "data-role", role);
+    }
+    if (m.suggested_files_where) {
+      filesWhere = m.suggested_files_where;
+      pick($("files-choices"), "data-files", filesWhere);
+    }
+  }).catch(() => { $("machine-line").textContent = "Could not read this computer."; });
+  runScan(true);
+  $("btn-copy").addEventListener("click", async () => {
+    const text = $("copy-url").textContent;
+    try { await navigator.clipboard.writeText(text); log("Copied " + text); }
+    catch { log(text); }
+  });
+
+  refresh().catch((err) => log("Could not read host status: " + err));
+  </script>
+</body>
+</html>

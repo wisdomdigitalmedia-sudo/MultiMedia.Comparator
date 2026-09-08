@@ -701,10 +701,11 @@ def _host_pack_py() -> Path | None:
     here = Path(__file__).resolve().parent
     catalog = find_catalog_db()
     candidates = [
-        here.parent / "Entertainment.Servers" / "host-installer" / "pack.py",
-        Path.home() / "Entertainment.Servers" / "host-installer" / "pack.py",
+        here / "media-host" / "host-installer" / "pack.py",
+        here / "host-installer" / "pack.py",
     ]
     if catalog:
+        # catalog.db lives in .../data/; installer is sibling host-installer/
         candidates.insert(0, catalog.parent.parent / "host-installer" / "pack.py")
     for path in candidates:
         if path.is_file():
@@ -717,7 +718,7 @@ def download_host_setup():
     """Click-and-run Media Host 1.6 installer (Windows, Linux, or Mac)."""
     pack = _host_pack_py()
     if not pack:
-        flash("Host installer pack not found next to Entertainment.Servers.", "error")
+        flash("Host installer pack not found (media-host/host-installer).", "error")
         return redirect(url_for("setup_page"))
     pack_dir = str(pack.parent)
     if pack_dir not in sys.path:

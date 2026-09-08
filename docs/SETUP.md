@@ -1,16 +1,16 @@
 # Setup guide
 
-This app is a **local catalog**. Clone it on the PC where you browse the library. If the media files live on another computer, also clone [Entertainment.Servers](https://github.com/wisdomdigitalmedia-sudo/Entertainment.Servers) (or download the host installer zip) onto that file host.
-
-Keep the two repositories as siblings when you use both:
+One clone covers the catalog PC and the file host.
 
 ```text
-your-workspace/
-  MultiMedia.Comparator/     ← this repo (UI on port 8767)
-  Entertainment.Servers/     ← agent, catalog.db, installer
+MultiMedia.Comparator/
+  run.sh / run.bat          ← catalog UI (port 8767)
+  INSTALL.sh / INSTALL.bat  ← file-host agent wizard
+  media-host/               ← agent, catalog store, installer pack
+  data/                     ← catalog.db (created locally, not in git)
 ```
 
-## 1. Catalog PC (this app)
+## 1. Catalog PC
 
 ### Linux or macOS
 
@@ -20,8 +20,6 @@ cd MultiMedia.Comparator
 chmod +x run.sh
 ./run.sh
 ```
-
-Creates a virtualenv, installs `requirements.txt`, and opens [http://127.0.0.1:8767](http://127.0.0.1:8767).
 
 Optional local deep scan:
 
@@ -41,21 +39,21 @@ brew install ffmpeg mediainfo
 2. Clone this repository.
 3. Double-click `run.bat`.
 
-### If `catalog.db` is not next to this repo
+### If `catalog.db` is somewhere else
 
 ```bash
-export MMC_CATALOG_DB=/absolute/path/to/Entertainment.Servers/data/catalog.db
+export MMC_CATALOG_DB=/absolute/path/to/catalog.db
 ./run.sh
 ```
 
 Windows (Command Prompt):
 
 ```bat
-set MMC_CATALOG_DB=C:\path\to\Entertainment.Servers\data\catalog.db
+set MMC_CATALOG_DB=C:\path\to\catalog.db
 run.bat
 ```
 
-`catalog.db` is created on first use if it does not exist. It is local to your machine and is **not** in git.
+`catalog.db` is created on first use under `data/` if it does not exist. It is **not** in git.
 
 ## 2. Answer the setup questions
 
@@ -68,13 +66,14 @@ Click **Scan this network** (ports 8766 and 8767 on this subnet), then **Suggest
 
 ## 3. File host (only if disks are on another PC)
 
-On the machine that holds the files:
+On the machine that holds the files, clone or copy **this same repository**:
 
-1. From Comparator **Setup**, download **media-host-setup-1.6.zip**, or copy the Entertainment.Servers folder.
-2. **Windows:** double-click `INSTALL.bat`. When Windows asks to allow changes, click **Yes** (the prompt may sit behind the browser). If the firewall step still fails, double-click `OPEN_FIREWALL.bat`.
-3. **Linux or macOS:** `chmod +x INSTALL.sh && ./INSTALL.sh`.
-4. Click **Set up this host**. Leave the agent window open.
-5. Copy the address shown (`http://FILE-HOST-IP:8766`).
+1. **Windows:** double-click `INSTALL.bat`. When Windows asks to allow changes, click **Yes** (the prompt may sit behind the browser). If the firewall step still fails, double-click `media-host/OPEN_FIREWALL.bat`.
+2. **Linux or macOS:** `chmod +x INSTALL.sh && ./INSTALL.sh`.
+3. Click **Set up this host**. Leave the agent window open.
+4. Copy the address shown (`http://FILE-HOST-IP:8766`).
+
+Or from the catalog PC **Setup** page, download **media-host-setup-1.6.zip** and unzip it on the file host.
 
 Then on the catalog PC: **Drives → Add media host → paste the address → List host drives → Add → Scan**.
 
@@ -98,11 +97,7 @@ The Comparator UI stays on `127.0.0.1:8767` and does not need a LAN firewall rul
 
 ### Linux catalog + Linux media server
 
-Same as above, but run `./INSTALL.sh` on the Linux file server and paste that host’s `http://LINUX-IP:8766`.
-
-### Windows catalog + Windows file server
-
-`run.bat` on the catalog PC; `INSTALL.bat` on the file PC.
+Same as above, but run `./INSTALL.sh` on the Linux file server.
 
 ### Single machine
 
@@ -117,7 +112,7 @@ Setup → “Both” + “This computer”. Add local paths only. No agent.
 
 ## 6. Updating the agent
 
-Copy a new Entertainment.Servers tree (or a new installer zip) onto the file host, stop the old agent window, and run `INSTALL.bat` / `INSTALL.sh` again. Deep scan of remote files needs agent **1.5+**. Confirmed extra-copy delete needs agent **1.5.2**.
+Copy a new clone (or a new installer zip) onto the file host, stop the old agent window, and run `INSTALL.bat` / `INSTALL.sh` again. Deep scan of remote files needs agent **1.5+**. Confirmed extra-copy delete needs agent **1.5.2**.
 
 ## 7. What is not in this repository
 
@@ -126,9 +121,7 @@ These stay on your disk only:
 - `data/catalog.db` and `data/comparator.db` (your library)
 - `tools/ffmpeg/` (downloaded `ffprobe`)
 - `.venv/`
-- Host-installer embedded Python (`host-installer/runtime/`)
-
-Do not commit them. See `.gitignore`.
+- `media-host/host-installer/runtime/` (embedded Python on Windows)
 
 ## Troubleshooting
 
@@ -138,4 +131,4 @@ Do not commit them. See `.gitignore`.
 | “Could not reach agent” | Paste `http://FILE-HOST-IP:8766` (not 127.0.0.1 from the other PC) |
 | Empty drive sizes | Agent offline; unknown sizes stay blank on purpose |
 | Deep scan skipped on remote files | Upgrade the agent; click Install ffprobe on the host wizard |
-| Catalog not found | Set `MMC_CATALOG_DB` or clone Entertainment.Servers as a sibling |
+| Catalog not found | Set `MMC_CATALOG_DB` or add a drive so `data/catalog.db` is created |

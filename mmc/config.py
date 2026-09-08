@@ -18,9 +18,11 @@ def _catalog_search_paths() -> list[Path]:
         paths.append(Path(env).expanduser())
     paths.extend(
         [
+            DATA_DIR / "catalog.db",
+            BASE_DIR / "media-host" / "data" / "catalog.db",
+            # Legacy sibling folder from before the projects were merged
             BASE_DIR.parent / "Entertainment.Servers" / "data" / "catalog.db",
             home / "Entertainment.Servers" / "data" / "catalog.db",
-            DATA_DIR / "catalog.db",
         ]
     )
     seen: set[str] = set()

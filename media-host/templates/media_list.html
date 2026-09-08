@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}All media — Media Catalog{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <h1>All media</h1>
+    <p class="muted">{{ items|length }} item{{ 's' if items|length != 1 else '' }}</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('export_all_ods', q=q, kind=kind, tag=tag, drive_id=drive_id or '') }}">Export ODS</a>
+  </div>
+</section>
+
+<form class="filters card" method="get">
+  <label>Search
+    <input type="search" name="q" value="{{ q }}" placeholder="title or path">
+  </label>
+  <label>Drive
+    <select name="drive_id">
+      <option value="">All drives</option>
+      {% for d in drives %}
+        <option value="{{ d.id }}" {% if drive_id == d.id %}selected{% endif %}>{{ d.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Type
+    <select name="kind">
+      <option value="">All</option>
+      <option value="movie" {% if kind == 'movie' %}selected{% endif %}>Movie</option>
+      <option value="episode" {% if kind == 'episode' %}selected{% endif %}>TV Show</option>
+      <option value="audio" {% if kind == 'audio' %}selected{% endif %}>MP3/FLAC</option>
+      <option value="other" {% if kind == 'other' %}selected{% endif %}>Other</option>
+    </select>
+  </label>
+  <label>Tag
+    <select name="tag">
+      <option value="">Any</option>
+      {% for t in all_tags %}
+        <option value="{{ t.name }}" {% if tag == t.name %}selected{% endif %}>{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit" class="btn">Filter</button>
+</form>
+
+{% if not items %}
+  <div class="empty card"><p>Nothing matched. Scan a drive first or clear filters.</p></div>
+{% else %}
+  <div class="table-wrap card">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Drive</th>
+          <th>Type</th>
+          <th>Size</th>
+          <th>Tags</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+          <tr>
+            <td><a href="{{ url_for('media_detail', media_id=item.id) }}">{{ item.display_title }}</a></td>
+            <td><a href="{{ url_for('drive_detail', drive_id=item.drive_id) }}">{{ item.drive_name }}</a></td>
+            <td><span class="pill pill-{{ item.kind }}">{% if item.kind == 'episode' %}TV Show{% elif item.kind == 'audio' %}MP3/FLAC{% else %}{{ item.kind }}{% endif %}</span></td>
+            <td>{{ item.size_bytes|filesize }}</td>
+            <td>{{ item.tags or '—' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}

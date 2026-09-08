@@ -14,8 +14,8 @@ def open_catalog(path: str | Path | None = None) -> Path:
     found = find_catalog_db(path)
     if not found:
         raise FileNotFoundError(
-            "Entertainment.Servers catalog.db not found. "
-            "Pass the path or add the sibling project on the Desktop."
+            "catalog.db not found. "
+            "Pass --catalog, set MMC_CATALOG_DB, or add a drive in the UI."
         )
     return found
 
